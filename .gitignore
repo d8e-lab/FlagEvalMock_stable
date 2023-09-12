@@ -1,0 +1,5 @@
+*.log
+*.csv
+logs/*
+__pycache__/*
+evaluation_results/*
