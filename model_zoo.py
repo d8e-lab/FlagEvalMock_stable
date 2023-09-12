@@ -31,7 +31,7 @@ class BaseLLM:
             return max([len(self.tokenizer(l).input_ids) for l in labels.values()])
 
 class Llama2(BaseLLM):
-    def __init__(self, model_name, model_path, tokenizer_path, config_path="") -> None:
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
@@ -40,7 +40,7 @@ class Llama2(BaseLLM):
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
             .bfloat16()
-            .cuda()
+            .to(gpu_id)
         )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
@@ -129,83 +129,13 @@ MODEL_CONFIGS = {
     '65b': LlamaConfig(hidden_size=8192, intermediate_size=22016, num_hidden_layers=80, num_attention_heads=64),
 }
 
-class Llama_colossalai:
-    def __init__(self, model_name, model_path, tokenizer_path, config_path="") -> None:
-        config = MODEL_CONFIGS['7b']
-        model = (
-            AutoModelForCausalLM.from_pretrained(model_path,config=config) #, trust_remote_code=True)
-            .bfloat16()
-            .cuda()
-        )
-        self.name = model_name
-        self.tokenizer = LlamaTokenizer.from_pretrained(
-            tokenizer_path,padding_side='left' #, trust_remote_code=True
-        )
-        self.model = model
-        # (
-        #     LlamaForCausalLM.from_pretrained(model_path) #, trust_remote_code=True)
-        #     .bfloat16()
-        #     .cuda()
-        # )
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        # ADDED
-        self.model.config.pad_token_id = self.model.config.eos_token_id
-
-        pass
-    def inference(self, queries, choices, use_logits, nt):
-        choice_tokens = [
-            self.tokenizer.encode(choice, add_special_tokens=False)[0]
-            for choice in choices
-        ]
-        queries = [preprocess(q) for q in queries]
-        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
-        # inputs = self.tokenizer(queries, return_tensors="pt")
-        # inputs = self.tokenizer(
-        #     queries, padding=True, return_tensors="pt", truncation=True, max_length=2048
-        # ).to("cuda")
-        if use_logits:
-            results = []
-            outputs = self.model(inputs.input_ids) # return_last_logit=True)
-            logits = outputs.logits[:, -1]
-            logits = logits[:, choice_tokens]
-            preds = logits.argmax(dim=-1)
-            for p in preds:
-                results.append(choices[p])
-        else:
-            gen_kwargs = {
-                "max_new_tokens": nt,
-                "num_beams": 1,
-                "do_sample": False,
-                "top_p": 0.9,
-                "temperature": 0.1,
-            }  # "logits_processor": logits_processor, **kwargs}
-            # ADDED
-            outputs = self.model.generate(**inputs, **gen_kwargs)
-            # outputs = outputs[:,-1*nt]
-            results = self.tokenizer.batch_decode(
-                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-            assert len(results) == len(queries)
-            for i,(query, result) in enumerate(zip(queries, results)):
-                length = len(query)
-                results[i] = result[length:]
-            # result = []
-            # for idx in range(len(outputs)):
-            #     # output = outputs.tolist()[idx][-1*nt:]
-            #     output = outputs.tolist()[idx][-1*nt:]
-            #     response = self.tokenizer.decode(output)
-            #     # response = re.sub(r'\n ', '', response)
-            #     response = response.replace("<pad>", "").replace("</s>", "").replace("<s>", "").replace("<unk>", "").replace(" ", "").replace("\n", "")
-            #     result.append(response)
-        results = [postprocess(result,self.name) for result in results]
-        return results
 
 class Llama_colossalai:
-    def __init__(self, model_name, model_path, tokenizer_path, config_path="") -> None:
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path,trust_remote_code=True)
             .bfloat16()
-            .cuda()
+            .to(gpu_id)
         )
             
         self.name = model_name

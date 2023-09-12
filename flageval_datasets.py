@@ -797,20 +797,22 @@ class BoolQDataset(Dataset):
         dataset = datasets.load_dataset("boolq")
         # print(dataset)
         self.name = "BoolQ"
-        self.prompt_heads = [
-            "Read the passage and answer the following true/false question.", # not so good
-            "Determine the correctness of the statement based on the given passage.", # NOPE
-            "Decide whether the statement is true or false according to the passage.",
-            "After reading the passage, indicate if the statement is true or false.",
-            "Choose whether the statement is true or false based on the provided passage.",
-            "Based on the passage, determine if the statement is true or false.",
-            "Confirm the truthfulness of the statement based on the passage.",
-        ]
+        # self.prompt_heads = [
+        #     "Read the passage and answer the following true/false question.", 
+        #     "Determine the correctness of the statement based on the given passage.", 
+        #     "Decide whether the statement is true or false according to the passage.",
+        #     "After reading the passage, indicate if the statement is true or false.",
+        #     "Choose whether the statement is true or false based on the provided passage.",
+        #     "Based on the passage, determine if the statement is true or false.",
+        #     "Confirm the truthfulness of the statement based on the passage.",
+        # ]
+
+        self.prompt_heads = [""]
 
         # 数据集文件是arrow文件，所以需要用datasets.load_from_disk，folder_path是数据集的文件夹路径
         self.item_size = item_size
         # self.prompt_dict = {1:'Positive', 0:'Negative'}
-        self.choice = ["True", "False"]
+        self.choice = ["Yes", "No"]
         # train_content = []
         # # 将数据集里的所有题目填进一个列表中
         # for ele in dataset:

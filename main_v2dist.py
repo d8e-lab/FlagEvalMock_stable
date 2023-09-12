@@ -17,6 +17,22 @@ from model_zoo import MODEL_DICT
 # from linly_llm import LinlyLLaMA2
 from functools import partial
 
+#parallel
+import torch.distributed as dist
+from torch.utils.data.distributed import DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
+def ddp_setup():
+    init_process_group(backend="nccl")
+
+def print_rank0(*args, **kwargs):
+    if dist.is_initialized():
+        rank = dist.get_rank()
+        if rank == 0:
+            print(*args, **kwargs)
+    else:
+        print(*args, **kwargs)
+
 all_start = time.time()
 parser = argparse.ArgumentParser(description="SETTINGS for MODELS")
 parser.add_argument(
@@ -46,7 +62,9 @@ model_name = args.model_name
 model_builder = MODEL_DICT[args.model_name]
 # model_builder=ChatGLM2
 # 模型加载
-llm = model_builder(args.model_name, args.model_path, args.tokenizer_path)
+ddp_setup()
+gpu_id=int(int(os.environ["LOCAL_RANK"]))
+llm = model_builder(args.model_name, args.model_path, args.tokenizer_path, gpu_id=gpu_id)
 
 if (
     os.path.exists(args.saver_path)
@@ -75,8 +93,8 @@ with torch.no_grad():
     for use_logits, dataset_name in settings:
         nt=ALL_NEW_TOKENS[dataset_name]
         dataset = get_dataset(dataset_name)
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size)
-        print("dataset_name:", dataset_name)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size,shuffle=False,sampler=DistributedSampler(dataset))
+        print_rank0("dataset_name:", dataset_name)
         total_correct = 0
         total_len = 0
         # if use_logits and nt > 1:
@@ -91,10 +109,6 @@ with torch.no_grad():
         choiceses=[]
         for batch in tqdm(dataloader):
             queries = batch["prompt"]
-            # print("queies:", queries)
-            # for q in queries:
-            #     print("q:", q)
-            #     exit()
             answers = batch["answer"]
             if hasattr(dataset, "generate_labels"):
                 candidate = dataset.generate_labels(answers)
@@ -102,36 +116,28 @@ with torch.no_grad():
                     choiceses = candidate
             else:
                 choiceses= [ choices for _ in queries]
-            # if batch.__contains__("labels"):
-            #     labels = batch["labels"]
-            #     nt=llm.get_token_length(labels)
-            #     print("nt:", nt)
             results = llm.inference(queries, choiceses, use_logits, nt)
             outputs.extend(results)
             truth.extend(answers)
             if len(outputs) > 20:
                 if args.verbose:
-                    print(len(results), len(answers))
-                    print("output: ", outputs)
-                    print("truth : ", truth)
+                    print_rank0(len(results), len(answers))
+                    print_rank0("output: ", outputs)
+                    print_rank0("truth : ", truth)
                 outputs = []
                 truth=[]
-            # print("results:", results)
-            # break
-            # how to generate the suitable answer
-            # how to extract the answer from the generated text
-            # how to evaluate the answer correctly
-            # print("results:", results)
-            # print("answers:", answers)
             correct += sum([1 if a.strip().strip(".") == i.strip() else 0 for (i, a) in zip(results, answers)])
         # exit()
         time_cost = time.time() - start
+        correct_tensor=torch.tensor(correct,device=gpu_id)
+        dist.barrier()
+        dist.reduce(correct_tensor, dst=0, op=dist.ReduceOp.SUM)
+        correct = int(correct_tensor)
         accuracy = correct / len(dataset)
         total_correct += correct
         total_len += len(dataset)
         acc = total_correct / total_len
-        # print(dataset.name, accuracy)
-        print(
+        print_rank0(
             f"{dataset_name} {use_logits} {nt} Total Accuracy: {acc} Time Cost: {time_cost}"
         )
         condition = (
@@ -148,25 +154,28 @@ with torch.no_grad():
             result_df.loc[condition, dataset_name] = acc
             result_df.loc[condition, dataset_name + "_time_cost"] = time_cost
 if not args.no_save:
-    if (
-        os.path.exists(args.saver_path)
-        and os.path.isfile(args.saver_path)
-        and args.saver_path.endswith(".csv")
-    ):
-        result_df.to_csv(args.saver_path, index=False)
-    else:
-        saved_name = args.saver_path
-        if saved_name is None or saved_name == "":
-            saved_name = "./evaluation_results/"
-        saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        saved_file = (
-            args.model_name
-            + "_"
-            + saved_time
-            + "_"
-            + "-".join(args.dataset_names.split(","))
-            + "_results.csv"
-        )
-        saved_name = os.path.join(saved_name, saved_file)
-        result_df.to_csv(saved_name, index=False)
-print("Evaluation Total Time Cost:", time.time() - all_start)
+    rank = dist.get_rank()
+    if rank == 0:
+        if (
+            os.path.exists(args.saver_path)
+            and os.path.isfile(args.saver_path)
+            and args.saver_path.endswith(".csv")
+        ):
+            result_df.to_csv(args.saver_path, index=False)
+        else:
+            saved_name = args.saver_path
+            if saved_name is None or saved_name == "":
+                saved_name = "./evaluation_results/"
+            saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+            saved_file = (
+                args.model_name
+                + "_"
+                + saved_time
+                + "_"
+                + "-".join(args.dataset_names.split(","))
+                + "_results.csv"
+            )
+            saved_name = os.path.join(saved_name, saved_file)
+            result_df.to_csv(saved_name, index=False)
+print_rank0("Evaluation Total Time Cost:", time.time() - all_start)
+
