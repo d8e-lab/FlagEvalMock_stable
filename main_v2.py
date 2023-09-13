@@ -106,7 +106,7 @@ with torch.no_grad():
             #     labels = batch["labels"]
             #     nt=llm.get_token_length(labels)
             #     print("nt:", nt)
-            results = llm.inference(queries, choiceses, use_logits, nt)
+            results = llm.inference(queries, choiceses, use_logits, nt, dataset_name)
             outputs.extend(results)
             truth.extend(answers)
             if len(outputs) > 20:
