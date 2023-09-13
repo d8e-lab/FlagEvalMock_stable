@@ -116,7 +116,7 @@ with torch.no_grad():
                     choiceses = candidate
             else:
                 choiceses= [ choices for _ in queries]
-            results = llm.inference(queries, choiceses, use_logits, nt)
+            results = llm.inference(queries, choiceses, use_logits, nt, dataset_names)
             outputs.extend(results)
             truth.extend(answers)
             if len(outputs) > 20:
