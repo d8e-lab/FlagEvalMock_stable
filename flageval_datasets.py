@@ -5,6 +5,7 @@ import torch
 import datasets
 import pdb
 import os
+import threading
 from datasets import load_dataset
 from torch.utils.data import Dataset, DataLoader
 
@@ -189,7 +190,7 @@ class BUSTMDataset(Dataset):
             self.dataset = list(map(lambda x: json.loads(x), data))
         self.name = "BUSTM"
         # self.first_line = "请根据提供的中文句子，判断它们是否属于同一语义：\n"
-        self.first_line = "判断文本是否属于同一语义：\n"
+        self.first_line = "文本语义是否相似\n"
         self.item_size = item_size
         self.prompt_dict = {"1": "A", "0": "B"}
 
@@ -210,8 +211,8 @@ class BUSTMDataset(Dataset):
             prompt += f"\n文本:"
             prompt += f"\n文本1: {sentence1}"
             prompt += f"\n文本2: {sentence2}"
-            prompt += f"\nA:属于"
-            prompt += f"\nB:不属于"
+            prompt += f"\nA:相似"
+            prompt += f"\nB:不相似"
             prompt += f"\n答案:{self.prompt_dict[label]}\n"
         return prompt
 
@@ -247,7 +248,7 @@ class OCNLIDataset(Dataset):
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
         self.name = "OCNLI"
-        self.first_line = "请根据下面的前提和假设句子进行推理，选择正确的关系：\n"
+        self.first_line = "推理下列两句话的关系\n"
         self.item_size = item_size
 
         for data in self.dataset.copy():
@@ -274,7 +275,7 @@ class OCNLIDataset(Dataset):
             prompt += f"\n文本:"
             prompt += f"\n前提: {sentence1}"
             prompt += f"\n假设: {sentence2}"
-            prompt += f"\nA:矛盾"
+            prompt += f"\nA:冲突"
             prompt += f"\nB:中立"
             prompt += f"\nC:蕴含"
             prompt += f"\n答案:{self.prompt_dict[label]}\n"
@@ -291,7 +292,7 @@ class OCNLIDataset(Dataset):
         prompt += f"\n文本:"
         prompt += f"\n前提: {sentence1}"
         prompt += f"\n假设: {sentence2}"
-        prompt += f"\nA:矛盾"
+        prompt += f"\nA:冲突"
         prompt += f"\nB:中立"
         prompt += f"\nC:蕴含"
         prompt += f"\n答案:\n"
@@ -306,11 +307,10 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
         self.name = "GAOKAO2023"
         file_name = os.path.basename(ceval_path)
         subject = file_name.split('_')[1]
-        subject_map = {"Math":"数学","English":"英语","Chinese":"语文","Political":"政治","Biology":"生物","Geography":"地理","Chemistry":"化学","History":"历史","Physics":"物理"}
-        self.first_line = "这个任务是关于"+subject_map[subject]+"的一组问题，请从给出的A、B、C、D四个选项中，选出其中的正确答案。\n"
+        # subject_map = {"Math":"数学","English":"英语","Chinese":"语文","Political":"政治","Biology":"生物","Geography":"地理","Chemistry":"化学","History":"历史","Physics":"物理"}
+        # self.first_line = "这个任务是关于"+subject_map[subject]+"的一组问题，请从给出的A、B、C、D四个选项中，选出其中的正确答案。\n"
         # self.first_line = "这个任务是关于一组问题，请从给出的A、B、C、D四个选项中，选出其中的正确答案。请回答'A'或'B'或'C'或'D'\n"
-        # self.first_line = "这个任务是关于【待填充】的选择题"
-        # self.first_line = "以下是"
+        self.first_line = "以下是2023 年高考的选择题（附答案），请从四个选项里选择正确答案."
         self.item_size = item_size
 
     def __len__(self):
@@ -465,7 +465,7 @@ class TruthfulQADataset(Dataset):
         self.name = "TruthfulQA"
         # self.first_line = "The following are some questions about truthfulness. Please choose the most authentic answer from the options.\n\n"
         # self.first_line = "The following are multiple choice questions (with answers) about truthfulness. Please choose the most authentic answer from the options.\n\n"
-        self.first_line = "The following are multiple choice questions (with answers) about truthfulness.\n\n"
+        # self.first_line = "The following are multiple choice questions (with answers) about truthfulness.\n\n"
         self.item_size = item_size
 
     def __len__(self):
@@ -475,7 +475,7 @@ class TruthfulQADataset(Dataset):
         ind = random.sample(range(len(self.dataset)), self.item_size)
         samples = self.dataset.select(ind)
         # Initialize the prompt string
-        prompt = self.first_line
+        prompt = ""
 
         for i, sample in enumerate(samples):
             z = sample["mc1_targets"]
@@ -571,7 +571,6 @@ class EPRSTMTDataset(Dataset):
     """
 
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
-        # ceval_path: ./BUSTM文件夹路径
         dev_path = os.path.join(ceval_path,'dev_few_all.json')
         test_path = os.path.join(ceval_path,'test_public.json')
         # train集不读取
@@ -585,7 +584,7 @@ class EPRSTMTDataset(Dataset):
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
         self.name = "EPRSTMT"
-        self.first_line = "判断下列评价是好评还是差评：\n"
+        self.first_line = "判断以下段落情感是积极还是消极\n"
         self.item_size = item_size
         self.prompt_dict = {"Positive": "A", "Negative": "B"}
 
@@ -603,8 +602,8 @@ class EPRSTMTDataset(Dataset):
             # 组合samples
             prompt += f"\n文本:"
             prompt += f"\n评价: {sentence}"
-            prompt += f"\nA:好评"
-            prompt += f"\nB:差评"
+            prompt += f"\nA:积极"
+            prompt += f"\nB:消极"
             prompt += f"\n答案:{self.prompt_dict[label]}\n"
             prompt += "\n"
         return prompt
@@ -618,8 +617,8 @@ class EPRSTMTDataset(Dataset):
         sentence = question["sentence"]
         prompt += f"\n文本:"
         prompt += f"\n评价: {sentence}"
-        prompt += f"\nA:好评"
-        prompt += f"\nB:差评"
+        prompt += f"\nA:积极"
+        prompt += f"\nB:消极"
         prompt += f"\n答案:\n"
 
         sample = {"prompt": prompt, "answer": self.prompt_dict[question["label"]]}
@@ -632,8 +631,6 @@ class TNEWSDataset(Dataset):
     """
 
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
-
-        # ceval_path: ./BUSTM文件夹路径
         dev_path = os.path.join(ceval_path,'dev_few_all.json')
         test_path = os.path.join(ceval_path,'test_public.json')
         # train集不读取
@@ -645,7 +642,7 @@ class TNEWSDataset(Dataset):
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
         self.name = "TNEWS"
-        self.first_line = "请判断出下列新闻的分类：\n"
+        self.first_line = "判断以下新闻属于哪一个类别\n"
         self.item_size = item_size
         self.prompt_dict = {
             "news_house": "A",
@@ -681,21 +678,21 @@ class TNEWSDataset(Dataset):
             prompt += f"\n文本:"
             prompt += f"\n新闻标题: {sentence}"
             prompt += f"\n关键词: {keywords}"
-            prompt += f"\nA:家庭新闻"
-            prompt += f"\nB:娱乐新闻"
-            prompt += f"\nC:体育新闻"
-            prompt += f"\nD:游戏新闻"
-            prompt += f"\nE:军事新闻"
-            prompt += f"\nF:文化新闻"
-            prompt += f"\nG:经济新闻"
-            prompt += f"\nH:农业新闻"
-            prompt += f"\nI:环球新闻"
-            prompt += f"\nJ:旅行新闻"
-            prompt += f"\nK:技术新闻"
-            prompt += f"\nL:故事新闻"
-            prompt += f"\nM:金融新闻"
-            prompt += f"\nN:教育新闻"
-            prompt += f"\nO:汽车新闻"
+            prompt += f"\nA:故事"
+            prompt += f"\nB:文化"
+            prompt += f"\nC:娱乐"
+            prompt += f"\nD:体育"
+            prompt += f"\nE:财经"
+            prompt += f"\nF:房产"
+            prompt += f"\nG:汽车"
+            prompt += f"\nH:教育"
+            prompt += f"\nI:科技"
+            prompt += f"\nJ:军事"
+            prompt += f"\nK:旅游"
+            prompt += f"\nL:国际"
+            prompt += f"\nM:股票"
+            prompt += f"\nN:农业"
+            prompt += f"\nO:电竞"
             prompt += f"\n答案:{self.prompt_dict[label]}\n"
             prompt += "\n"
         return prompt
@@ -712,21 +709,21 @@ class TNEWSDataset(Dataset):
         prompt += f"\n文本:"
         prompt += f"\n新闻标题: {sentence}"
         prompt += f"\n关键词: {keywords}"
-        prompt += f"\nA:家庭新闻"
-        prompt += f"\nB:娱乐新闻"
-        prompt += f"\nC:体育新闻"
-        prompt += f"\nD:游戏新闻"
-        prompt += f"\nE:军事新闻"
-        prompt += f"\nF:文化新闻"
-        prompt += f"\nG:经济新闻"
-        prompt += f"\nH:农业新闻"
-        prompt += f"\nI:环球新闻"
-        prompt += f"\nJ:旅行新闻"
-        prompt += f"\nK:技术新闻"
-        prompt += f"\nL:故事新闻"
-        prompt += f"\nM:金融新闻"
-        prompt += f"\nN:教育新闻"
-        prompt += f"\nO:汽车新闻"
+        prompt += f"\nA:故事"
+        prompt += f"\nB:文化"
+        prompt += f"\nC:娱乐"
+        prompt += f"\nD:体育"
+        prompt += f"\nE:财经"
+        prompt += f"\nF:房产"
+        prompt += f"\nG:汽车"
+        prompt += f"\nH:教育"
+        prompt += f"\nI:科技"
+        prompt += f"\nJ:军事"
+        prompt += f"\nK:旅游"
+        prompt += f"\nL:国际"
+        prompt += f"\nM:股票"
+        prompt += f"\nN:农业"
+        prompt += f"\nO:电竞"
         prompt += f"\n答案:\n"
         sample = {"prompt": prompt, "answer": self.prompt_dict[label]}
         return sample
@@ -742,7 +739,8 @@ class IMDBDataset(Dataset):
         self.train_dataset = datasets.load_dataset("imdb")["train"]
 
         self.name = "IMDB"
-        self.first_line = "In this task, you will be presented with some text. Please determine whether the text is positive or negative.Please answer with 'Positive' or 'Negative'.\n"
+        # self.first_line = "In this task, you will be presented with some text. Please determine whether the text is positive or negative.Please answer with 'Positive' or 'Negative'.\n"
+        self.first_line = ""
         self.item_size = item_size
         self.prompt_dict = {1: "Positive", 0: "Negative"}
 
@@ -893,6 +891,8 @@ class MMLUDataset(Dataset):
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         # dataset = load_dataset("tasksource/mmlu")
+        self.lock_dev = threading.Lock()
+        self.lock_val = threading.Lock()
         dataset_name = "tasksource/mmlu"
         courses = [
             "abstract_algebra",
@@ -977,22 +977,42 @@ class MMLUDataset(Dataset):
         self.item_size = item_size
         # self.prompt_dict = {1:'Positive', 0:'Negative'}
         self.choice = ["True", "False"]
+        # val_content = []
+        # dev_content = []
+        # # 将数据集里的所有题目填进一个列表中
+        # for sub in courses:
+        #     dataset = load_dataset(dataset_name, sub)
+        #     for k in range(len(dataset["validation"])):
+        #         val_content.append(dataset["validation"][k])
+        #     for k_dev in range(len(dataset["dev"])):
+        #         dev_content.append(dataset["dev"][k_dev])
+        self.dataset,self.dev_dataset = self.load_datasets_parallel(courses=courses,dataset_name=dataset_name)
+
+    def process_dataset(self,dataset_name, sub, val_content, dev_content):
+        dataset = load_dataset(dataset_name, sub)
+        for k in range(len(dataset["validation"])):
+            self.lock_val.acquire()
+            val_content.append(dataset["validation"][k])
+            self.lock_val.release()
+        for k_dev in range(len(dataset["dev"])):
+            self.lock_dev.acquire()
+            dev_content.append(dataset["dev"][k_dev])
+            self.lock_dev.release()
+    def load_datasets_parallel(self,courses, dataset_name):
         val_content = []
         dev_content = []
-        # 将数据集里的所有题目填进一个列表中
-        for sub in courses:
-            dataset = load_dataset(dataset_name, sub)
-            # pdb.set_trace()
-            for k in range(len(dataset["validation"])):
-                val_content.append(dataset["validation"][k])
-            for k_dev in range(len(dataset["dev"])):
-                dev_content.append(dataset["dev"][k_dev])
-            # for ele in dataset:
-                # for k in range(len(dataset[ele])):
-                #     _content.append(dataset[ele][k])
-        self.dataset = val_content
-        self.dev_dataset = dev_content
 
+        threads = []
+        for sub in courses:
+            thread = threading.Thread(target=self.process_dataset, args=(dataset_name, sub, val_content, dev_content))
+            thread.start()
+            threads.append(thread)
+
+        # Wait for all threads to finish
+        for thread in threads:
+            thread.join()
+        return val_content, dev_content
+    
     def __len__(self):
         return len(self.dataset)
 
@@ -1112,7 +1132,8 @@ class ChIDDataset(Dataset):
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
         self.first_line = (
-            "在这个任务中，你将面对一些不完整的句子，其中句子中成语被'#idiom#'取代，以成语完形填空形式实现，从给定的七个选项,选择正确答案：\n"
+            # "在这个任务中，你将面对一些不完整的句子，其中句子中成语被'#idiom#'取代，以成语完形填空形式实现，从给定的七个选项,选择正确答案：\n"
+            "阅读以下文章，并选择一个合适的成语"
         )
         self.item_size = item_size
 
@@ -1183,9 +1204,10 @@ class CSLDataset(Dataset):
         with open(test_path, "r", encoding="utf-8") as f:
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
-        self.first_line = "在此任务中，将给出一段摘要与几个关键词，根据给出的摘要与关键词的关系，判断关键词是真实还是伪造，关键词为真实时请回答'真实'，关键词为伪造时请回答'伪造'：\n"
+        # self.first_line = "在此任务中，将给出一段摘要与几个关键词，根据给出的摘要与关键词的关系，判断关键词是真实还是伪造，关键词为真实时请回答'真实'，关键词为伪造时请回答'伪造'：\n"
+        self.first_line = "摘要关键词判别"
         self.item_size = item_size
-        self.prompt_dict = {"1": "真实", "0": "伪造"}
+        self.prompt_dict = {"1": "正确", "0": "错误"}
         self.choice_dict = {"1": "A", "0": "B"}
 
     def __len__(self):
@@ -1252,7 +1274,8 @@ class CLUEWSCDataset(Dataset):
         with open(test_path, "r", encoding="utf-8") as f:
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
-        self.first_line = "根据下面这段句子，判断指定位置的代词是否指代指定位置的名词,如果是请回答'是',如果不是请回答'否'\n"
+        # self.first_line = "根据下面这段句子，判断指定位置的代词是否指代指定位置的名词,如果是请回答'是',如果不是请回答'否'\n"
+        self.first_line = "代词是否指向给定名词短语："
         self.item_size = item_size
         self.prompt_dict = {"true": "是", "false": "否"}
 
