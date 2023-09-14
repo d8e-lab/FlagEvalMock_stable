@@ -3,4 +3,4 @@
 logs/*
 __pycache__/*
 evaluation_results/*
-copied_scripts/**
+copied_scripts/**/*
