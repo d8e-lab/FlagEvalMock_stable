@@ -1268,10 +1268,9 @@ class CLUEWSCDataset(Dataset):
         with open(test_path, "r", encoding="utf-8") as f:
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
-        # self.first_line = "根据下面这段句子，判断指定位置的代词是否指代指定位置的名词,如果是请回答'是',如果不是请回答'否'\n"
         self.first_line = "代词是否指向给定名词短语："
         self.item_size = item_size
-        self.prompt_dict = {"true": "是", "false": "否"}
+        self.prompt_dict = {"true": "A", "false": "B"}
 
     def __len__(self):
         return len(self.dataset)
@@ -1284,21 +1283,14 @@ class CLUEWSCDataset(Dataset):
 
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
-            prompt += "句子：" + str(sample["text"]) + "\n"
-            prompt += (
-                "位于指定位置("
-                + str(sample["target"]["span2_index"])
-                + ")的代词："
-                + str(sample["target"]["span2_text"])
-                + "\n"
-            )
-            prompt += (
-                "位于指定位置("
-                + str(sample["target"]["span1_index"])
-                + ")的名词："
-                + str(sample["target"]["span1_text"])
-                + "\n"
-            )
+            prompt += "段落：" + str(sample["text"]) + "\n"
+            prompt += ("问题："
+                       +str(sample["target"]["span1_text"])+str(sample["target"]["span1_index"])
+                       +"是指代"
+                       +str(sample["target"]["span1_text"])+str(sample["target"]["span1_index"])
+                       +"吗\n"
+                       +"A. 正确\n"
+                       +"B. 错误\n")
             prompt += "答案：" + str(self.prompt_dict[str(sample["label"])]) + "\n"
             prompt += "\n"
 
@@ -1312,22 +1304,14 @@ class CLUEWSCDataset(Dataset):
         answer = str(self.prompt_dict[str(entry["label"])])
 
         prompt += "" + str(entry["text"]) + "\n"
-        prompt += (
-            "位于指定位置("
-            + str(entry["target"]["span2_index"])
-            + ")的代词："
-            + str(entry["target"]["span2_text"])
-            + "\n"
-        )
-        prompt += (
-            "位于指定位置("
-            + str(entry["target"]["span1_index"])
-            + ")的名词："
-            + str(entry["target"]["span1_text"])
-            + "\n"
-        )
-
-        prompt += "答案：" + "\n"
+        prompt += ("问题："
+                    +str(entry["target"]["span1_text"])+str(entry["target"]["span1_index"])
+                    +"是指代"
+                    +str(entry["target"]["span1_text"])+str(entry["target"]["span1_index"])
+                    +"吗\n"
+                    +"A. 正确\n"
+                    +"B. 错误\n")
+        prompt += "答案:\n"
         prompt += "\n"
 
         sample = {"prompt": prompt, "answer": answer}
