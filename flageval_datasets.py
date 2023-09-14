@@ -891,8 +891,6 @@ class MMLUDataset(Dataset):
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         # dataset = load_dataset("tasksource/mmlu")
-        self.lock_dev = threading.Lock()
-        self.lock_val = threading.Lock()
         dataset_name = "tasksource/mmlu"
         courses = [
             "abstract_algebra",
@@ -991,13 +989,9 @@ class MMLUDataset(Dataset):
     def process_dataset(self,dataset_name, sub, val_content, dev_content):
         dataset = load_dataset(dataset_name, sub)
         for k in range(len(dataset["validation"])):
-            self.lock_val.acquire()
             val_content.append(dataset["validation"][k])
-            self.lock_val.release()
         for k_dev in range(len(dataset["dev"])):
-            self.lock_dev.acquire()
             dev_content.append(dataset["dev"][k_dev])
-            self.lock_dev.release()
     def load_datasets_parallel(self,courses, dataset_name):
         val_content = []
         dev_content = []
