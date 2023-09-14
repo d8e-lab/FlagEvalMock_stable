@@ -47,7 +47,7 @@ class Llama2(BaseLLM):
             self.model.config.pad_token_id = self.model.config.bos_token_id
         pass
 
-    def inference(self, queries, choiceses, use_logits, nt):
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name):
         choice_tokenss = []
         for choices in choiceses:
             choice_tokens = [
@@ -137,14 +137,8 @@ class Llama_colossalai:
             .bfloat16()
             .to(gpu_id)
         )
-            
+          
         self.name = model_name
-        # self.tokenizer = AutoTokenizer.from_pretrained(
-        #     tokenizer_path, trust_remote_code=True
-        # )
-        # self.tokenizer = LlamaTokenizerFast.from_pretrained(
-        #     tokenizer_path, truncation_side='left' #, trust_remote_code=True
-        # )
         self.tokenizer = LlamaTokenizer.from_pretrained(
             tokenizer_path, padding_side='left',truncation_side="left", trust_remote_code=True
         )
@@ -152,8 +146,7 @@ class Llama_colossalai:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
         pass
-
-    def inference(self, queries, choiceses, use_logits, nt):
+    def inference(self, queries, choiceses, use_logits, nt,dataset_name):
         choice_tokenss = []
         for choices in choiceses:
             choice_tokens = [
@@ -164,20 +157,16 @@ class Llama_colossalai:
         queries = [preprocess(q) for q in queries]
         for i in range(len(queries)):
             queries[i] = queries[i].replace('\n', ' ')
+            queries[i] = queries[i].replace('\\', '')
         inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
-        # inputs = self.tokenizer(queries, return_tensors="pt")
-        # inputs = self.tokenizer.build_inputs_for_generation(inputs, max_gen_length=512)
-        # pdb.set_trace()
-        # inputs = self.tokenizer.build_inputs_with_special_tokens(inputs['input_ids'])
-        # inputs = {key: value.cuda() for key, value in inputs.items()}
         if use_logits:
-            result = []
+            results = []
             outputs = self.model(inputs.input_ids)# return_last_logit=True)
             logits = outputs.logits[:, -1]
-            logits = logits[:, choice_tokens]
-            preds = logits.argmax(dim=-1)
-            for p in preds:
-                result.append(choices[p])
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
         else:
             gen_kwargs = {
                 "max_new_tokens": nt,
@@ -186,24 +175,18 @@ class Llama_colossalai:
                 "top_p": 0.9,
                 "temperature": 0.1,
             }  # "logits_processor": logits_processor, **kwargs}
-            # self.model.config.pad_token_id = self.model.config.eos_token_id
             outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
-            # outputs = self.model.generate(inputs.input_ids, **gen_kwargs)
-            # pdb.set_trace()
-            outputs = outputs[:,-1*nt]
+            if dataset_name in ['MMLU','IMDB','RAFT','C-Eval']:
+                outputs = outputs[:,-1*nt:]
+            else:
+                outputs = outputs[:,-1*nt]
             results = self.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
-            # result = []
-            # for idx in range(len(outputs)):
-            #     # output = outputs.tolist()[idx][-1*nt:]
-            #     output = outputs.tolist()[idx][-1*nt:]
-            #     response = self.tokenizer.decode(output)
-            #     # response = re.sub(r'\n ', '', response)
-            #     response = response.replace("<pad>", "").replace("</s>", "").replace("<s>", "").replace("<unk>", "").replace(" ", "").replace("\n", "")
-            #     result.append(response)
-        # pdb.set_trace()
-        results = [postprocess(result,self.name) for result in results]
+        if dataset_name in ['MMLU','RAFT','C-Eval']:
+            results = [postprocess_(result,self.name) for result in results]
+        else:
+            results = [postprocess(result,self.name) for result in results]
         return results
 
 MODEL_DICT = {
