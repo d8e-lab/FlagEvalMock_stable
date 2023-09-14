@@ -131,11 +131,11 @@ MODEL_CONFIGS = {
 
 
 class Llama_colossalai:
-    def __init__(self, model_name, model_path, tokenizer_path, config_path="") -> None:
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path,trust_remote_code=True)
             .bfloat16()
-            .cuda()
+            .to(gpu_id)
         )
           
         self.name = model_name
