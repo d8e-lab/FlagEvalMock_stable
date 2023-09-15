@@ -12,9 +12,30 @@ def preprocess(query):
     query=re.sub(r"^[\s\n\t\ufff0-\uffff]+", "", query)
     query=re.sub(r"[\s\n\t\ufff0-\uffff]+$", "", query)
     return query
+
 def postprocess(result,model_name:str=""):
     result = result.split("\n")[0]
+    result = result.split(' ', 1)[0]
     result=result.strip("答案")
+    result=result.replace("Sentence","")
+    result=result.replace("Passage","")
+    result=result.replace("Question","")
+    result = re.sub(r"^[\s\n\t:：\ufff0-\uffff]+", "", result)
+    result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
+    return result
+def postprocess_(result,model_name:str=""):
+    # result = result.split("\n")[0]
+    result=result.strip("答案")
+    result=result.replace("Sentence","")
+    result=result.split("Paper",1)[0]
+    result=result.split("Tweet",1)[0]
+    result=result.split("Article",1)[0]
+    result=result.split("Query",1)[0]
+    result=result.split("Tile",1)[0]
+    result=result.split("Text",1)[0]
+    result=result.split(":",1)[0]
+    result=result.replace("Passage","")
+    result=result.replace("Question","")
     result = re.sub(r"^[\s\n\t:：\ufff0-\uffff]+", "", result)
     result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
     return result
