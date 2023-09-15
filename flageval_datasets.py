@@ -273,12 +273,12 @@ class OCNLIDataset(Dataset):
 
             # Add the sample information to the prompt
             prompt += f"\n文本:"
-            prompt += f"\n前提: {sentence1}"
-            prompt += f"\n假设: {sentence2}"
-            prompt += f"\nA:冲突"
-            prompt += f"\nB:中立"
-            prompt += f"\nC:蕴含"
-            prompt += f"\n答案:{self.prompt_dict[label]}\n"
+            prompt += f"\n文本1: {sentence1}"
+            prompt += f"\n文本2: {sentence2}"
+            prompt += f"\nA. 冲突"
+            prompt += f"\nB: 中立"
+            prompt += f"\nC: 蕴含"
+            prompt += f"\n答案: {self.prompt_dict[label]}\n"
         return prompt
 
     def __getitem__(self, index):
@@ -290,12 +290,12 @@ class OCNLIDataset(Dataset):
         sentence2 = entry["sentence2"]
         answer = entry["label"]
         prompt += f"\n文本:"
-        prompt += f"\n前提: {sentence1}"
-        prompt += f"\n假设: {sentence2}"
-        prompt += f"\nA:冲突"
-        prompt += f"\nB:中立"
-        prompt += f"\nC:蕴含"
-        prompt += f"\n答案:\n"
+        prompt += f"\n文本1: {sentence1}"
+        prompt += f"\n文本2: {sentence2}"
+        prompt += f"\nA: 冲突"
+        prompt += f"\nB: 中立"
+        prompt += f"\nC: 蕴含"
+        prompt += f"\n答案: \n"
         sample = {"prompt": prompt, "answer": self.prompt_dict[answer]}
         return sample
 
@@ -324,7 +324,7 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
 
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
-            prompt += "问题：" + str(sample["question"]) + "\n"
+            prompt += "题目：" + str(sample["question"]) + "\n"
             prompt += str(sample["choices"]) + "\n"
             prompt += "答案：" + str(sample["answer"][0]) + "\n"
             prompt += "\n"
@@ -338,7 +338,7 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
         entry = self.dataset[idx]
         answer = entry["answer"][0]
 
-        prompt += "问题：" + str(entry["question"]) + "\n"
+        prompt += "题目：" + str(entry["question"]) + "\n"
         prompt += str(entry["choices"]) + "\n"
         prompt += "答案：" + "\n"
         prompt += "\n"
@@ -486,8 +486,7 @@ class TruthfulQADataset(Dataset):
             shuffled_choices = [z["choices"][i] for i in shuffled_indices]
             new_answer_index = shuffled_indices.index(z["labels"].index(1))
 
-            prompt += str(sample["question"]) + "\n"
-            prompt += "options: " + "\n"
+            prompt += "Question: "+str(sample["question"]) + "\n"
             prompt += (
                 "\n".join(
                     [f"{a}. {c}" for (a, c) in zip(ALPHABET[: len(shuffled_choices)], shuffled_choices)]
@@ -501,12 +500,11 @@ class TruthfulQADataset(Dataset):
     def __multi_choice_prompt__(self, ban_index=-1):
         ind = random.sample(range(len(self.dataset)), self.item_size)
         samples = self.dataset.select(ind)
-        prompt = self.first_line
+        prompt = ""
 
         for i, sample in enumerate(samples):
             z = sample["mc2_targets"]
-            prompt += str(sample["question"]) + "\n"
-            prompt += "Options: " + "\n"
+            prompt += "Question: "+str(sample["question"]) + "\n"
             prompt += (
                 "\n".join(
                     [
@@ -527,21 +525,8 @@ class TruthfulQADataset(Dataset):
     def __getitem__(self, index):
         idx = index
         prompt = self.__generate_prompt__(idx)
-        # prompt = self.first_line
-        # prompt = self.__multi_choice_prompt__(idx)
+
         entry = self.dataset[idx]
-        # z = entry["mc1_targets"]
-        # # z=entry['mc2_targets']
-        # answer = ALPHABET[z["labels"].index(1)]
-        # z = z["choices"]
-        # prompt += str(entry["question"]) + "\n"
-        # prompt += "Options: " + "\n"
-        # prompt += (
-        #     "\n".join([f"{a}. {c}" for (a, c) in zip(ALPHABET[: len(z)], z)]) + "\n"
-        # )
-        # prompt += "Answer: " + "\n"
-        # prompt += "\n"
-        # # 数据集里都是A，需要做一下shuffle
 
         z = entry["mc1_targets"]
         # Shuffle choices and adjust answer accordingly
@@ -550,8 +535,7 @@ class TruthfulQADataset(Dataset):
         shuffled_choices = [z["choices"][i] for i in shuffled_indices]
         new_answer_index = shuffled_indices.index(z["labels"].index(1))
 
-        prompt += str(entry["question"]) + "\n"
-        prompt += "options: " + "\n"
+        prompt += "Question: "+str(entry["question"]) + "\n"
         prompt += (
             "\n".join(
                 [f"{a}. {c}" for (a, c) in zip(ALPHABET[: len(shuffled_choices)], shuffled_choices)]
@@ -600,8 +584,7 @@ class EPRSTMTDataset(Dataset):
             sentence = sample["sentence"]
             label = sample["label"]
             # 组合samples
-            prompt += f"\n文本:"
-            prompt += f"\n评价: {sentence}"
+            prompt += f"\n文本: {sentence}"
             prompt += f"\nA:积极"
             prompt += f"\nB:消极"
             prompt += f"\n答案:{self.prompt_dict[label]}\n"
@@ -615,8 +598,7 @@ class EPRSTMTDataset(Dataset):
         question = self.dataset[idx]
         # z=entry['mc2_targets']
         sentence = question["sentence"]
-        prompt += f"\n文本:"
-        prompt += f"\n评价: {sentence}"
+        prompt += f"\n文本: {sentence}"
         prompt += f"\nA:积极"
         prompt += f"\nB:消极"
         prompt += f"\n答案:\n"
@@ -645,21 +627,36 @@ class TNEWSDataset(Dataset):
         self.first_line = "判断以下新闻属于哪一个类别\n"
         self.item_size = item_size
         self.prompt_dict = {
-            "news_house": "A",
-            "news_entertainment": "B",
-            "news_sports": "C",
-            "news_game": "D",
-            "news_military": "E",
-            "news_culture": "F",
-            "news_finance": "G",
-            "news_agriculture": "H",
-            "news_world": "I",
-            "news_travel": "J",
-            "news_tech": "K",
-            "news_story": "L",
+            # "news_house": "A",
+            # "news_entertainment": "B",
+            # "news_sports": "C",
+            # "news_game": "D",
+            # "news_military": "E",
+            # "news_culture": "F",
+            # "news_finance": "G",
+            # "news_agriculture": "H",
+            # "news_world": "I",
+            # "news_travel": "J",
+            # "news_tech": "K",
+            # "news_story": "L",
+            # "news_stock": "M",
+            # "news_edu": "N",
+            # "news_car": "O",
+            "news_story": "A",
+            "news_culture": "B",
+            "news_entertainment": "C",
+            "news_sports": "D",
+            "news_finance": "E",
+            "news_house": "F",
+            "news_car": "G",
+            "news_edu": "H",
+            "news_tech": "I",
+            "news_military": "J",
+            "news_travel": "K",
+            "news_world": "L",
             "news_stock": "M",
-            "news_edu": "N",
-            "news_car": "O",
+            "news_agriculture": "N",
+            "news_game": "O",
         }
 
     def __len__(self):
@@ -758,9 +755,9 @@ class IMDBDataset(Dataset):
         prompt = self.first_line
 
         for i, sample in enumerate(samples):
-            prompt += "Text from train_set: "+"\n"+str(sample["text"]) + "\n"
+            prompt += "Passage: "+"\n"+str(sample["text"]) + "\n"
             # prompt += str(sample["text"]) + "\n"
-            prompt += "Answer: " + self.prompt_dict[sample["label"]] + "\n"
+            prompt += "Sentiment: " + self.prompt_dict[sample["label"]] + "\n"
             prompt += "\n"
         # print("prompt: ",prompt)
         return prompt
@@ -772,9 +769,9 @@ class IMDBDataset(Dataset):
         sample = self.dataset[idx]
         # z=entry['mc2_targets']
         answer = self.prompt_dict[sample["label"]]
-        prompt += "Text from test_set: "+"\n"+str(sample["text"]) + "\n"
+        prompt += "Passage: "+"\n"+str(sample["text"]) + "\n"
         # prompt += str(sample["text"]) + "\n"
-        prompt += "Answer: " + "\n"
+        prompt += "Sentiment: " + "\n"
         prompt += "\n"
 
         sample = {"prompt": prompt, "answer": answer}
@@ -795,30 +792,12 @@ class BoolQDataset(Dataset):
         dataset = datasets.load_dataset("boolq")
         # print(dataset)
         self.name = "BoolQ"
-        # self.prompt_heads = [
-        #     "Read the passage and answer the following true/false question.", 
-        #     "Determine the correctness of the statement based on the given passage.", 
-        #     "Decide whether the statement is true or false according to the passage.",
-        #     "After reading the passage, indicate if the statement is true or false.",
-        #     "Choose whether the statement is true or false based on the provided passage.",
-        #     "Based on the passage, determine if the statement is true or false.",
-        #     "Confirm the truthfulness of the statement based on the passage.",
-        # ]
-
         self.prompt_heads = [""]
 
         # 数据集文件是arrow文件，所以需要用datasets.load_from_disk，folder_path是数据集的文件夹路径
         self.item_size = item_size
         # self.prompt_dict = {1:'Positive', 0:'Negative'}
         self.choice = ["Yes", "No"]
-        # train_content = []
-        # # 将数据集里的所有题目填进一个列表中
-        # for ele in dataset:
-        #     for k in range(len(dataset[ele])):
-        #         train_content.append(dataset[ele][k])
-        # self.dataset = train_content
-        # self.dataset = dataset['validation']
-        # self.train_dataset = dataset['train']
         _content = []
         for k in range(len(dataset['validation'])):
             _content.append(dataset['validation'][k])
@@ -833,20 +812,18 @@ class BoolQDataset(Dataset):
     def __generate_prompt__(self, ban_index=-1):
         train_sample = random.sample(self.train_dataset, self.item_size)
         prompt = [random.choice(self.prompt_heads) + "\n"]
-        prompt_choice = "A. " + self.choice[0] + "\nB. " + self.choice[1] + "\n"
         for i, item in enumerate(train_sample):
             FLAG = str(item.get("answer", ""))
             if FLAG == "True":
-                FLAG = "A"
+                FLAG = "Yes"
             elif FLAG == "False":
-                FLAG = "B"
+                FLAG = "No"
             prompt_item = (
                 "\nPassage: "
                 + item["passage"]
                 + "\nQuestion: "
                 + item["question"]
-                + "?\n"
-                + prompt_choice
+                + "?"
                 + "\nAnswer: "
                 + FLAG
                 + "\n"
@@ -864,18 +841,16 @@ class BoolQDataset(Dataset):
         # answer = self.prompt_dict[sample['answer']]
         FLAG = str(sample.get("answer", ""))
         if FLAG == "True":
-            FLAG = "A"
+            FLAG = "Yes"
         elif FLAG == "False":
-            FLAG = "B"
+            FLAG = "No"
         answer = FLAG
-        prompt_choice = "A. " + self.choice[0] + "\nB. " + self.choice[1] + "\n"
         prompt += (
             "\nPassage: "
             + sample["passage"]
             + "\nQuestion: "
             + sample["question"]
-            + "?\n"
-            + prompt_choice
+            + "?"
             + "\nAnswer: "
             + "\n"
         )
@@ -893,97 +868,70 @@ class MMLUDataset(Dataset):
         # dataset = load_dataset("tasksource/mmlu")
         dataset_name = "tasksource/mmlu"
         courses = [
-            "abstract_algebra",
+            "abstract algebra",
             "anatomy",
             "astronomy",
-            "business_ethics",
-            "clinical_knowledge",
-            "college_biology",
-            "college_chemistry",
-            "college_computer_science",
-            "college_mathematics",
-            "college_medicine",
-            "college_physics",
-            "computer_security",
-            "conceptual_physics",
+            "business ethics",
+            "clinical knowledge",
+            "college biology",
+            "college chemistry",
+            "college computer science",
+            "college mathematics",
+            "college medicine",
+            "college physics",
+            "computer security",
+            "conceptual physics",
             "econometrics",
-            "electrical_engineering",
-            "elementary_mathematics",
-            "formal_logic",
-            "global_facts",
-            "high_school_biology",
-            "high_school_chemistry",
-            "high_school_computer_science",
-            "high_school_european_history",
-            "high_school_geography",
-            "high_school_government_and_politics",
-            "high_school_macroeconomics",
-            "high_school_mathematics",
-            "high_school_microeconomics",
-            "high_school_physics",
-            "high_school_psychology",
-            "high_school_statistics",
-            "high_school_us_history",
-            "high_school_world_history",
-            "human_aging",
-            "human_sexuality",
-            "international_law",
+            "electrical engineering",
+            "elementary mathematics",
+            "formal logic",
+            "global facts",
+            "high school biology",
+            "high school chemistry",
+            "high school computer science",
+            "high school european history",
+            "high school geography",
+            "high school government and politics",
+            "high school macroeconomics",
+            "high school mathematics",
+            "high school microeconomics",
+            "high school physics",
+            "high school psychology",
+            "high school statistics",
+            "high school us history",
+            "high school world history",
+            "human aging",
+            "human sexuality",
+            "international law",
             "jurisprudence",
-            "logical_fallacies",
-            "machine_learning",
+            "logical fallacies",
+            "machine learning",
             "management",
             "marketing",
-            "medical_genetics",
+            "medical genetics",
             "miscellaneous",
-            "moral_disputes",
-            "moral_scenarios",
+            "moral disputes",
+            "moral scenarios",
             "nutrition",
             "philosophy",
             "prehistory",
-            "professional_accounting",
-            "professional_law",
-            "professional_medicine",
-            "professional_psychology",
-            "public_relations",
-            "security_studies",
+            "professional accounting",
+            "professional law",
+            "professional medicine",
+            "professional psychology",
+            "public relations",
+            "security studies",
             "sociology",
-            "us_foreign_policy",
+            "us foreign policy",
             "virology",
-            "world_religions",
+            "world religions",
         ]
         self.name = "MMLU"
-        self.prompt_heads = [
-            "The following are multiple-choice questions with their respective answer choices.",
-            "Test your knowledge with the following multiple-choice questions and select the correct answer.",
-            "Answer the following multiple-choice questions by selecting the appropriate options.",
-            "This prompt presents a set of multiple-choice questions for you to answer.",
-            "Choose the correct option for the following multiple-choice questions.",
-            "Select the most suitable answer from the options provided for multiple-choice question.",
-            "Test your knowledge with the following multiple-choice questions by selecting the correct answers.",
-            "This prompt presents a set of multiple-choice questions covering different fields of knowledge.",
-            "Answer each of the following multiple-choice questions by selecting the most appropriate option.",
-            "Evaluate your knowledge by selecting the correct answer for each of the following multiple-choice questions.",
-            "This prompt contains multiple-choice questions from a wide range of subjects.",
-            "Select the appropriate option for each of the following multiple-choice questions.",
-            "Choose the correct option from the given choices for each multiple-choice question.",
-        ]
-        # self.prompt_heads=[
-        #     "The following are multiple choice questions about "
-        # ]
-
+        self.prompt_heads=["The following are multiple choice questions (with answers) about "]# append with courses+'.'
         # 数据集文件是arrow文件，所以需要用datasets.load_from_disk，folder_path是数据集的文件夹路径
         self.item_size = item_size
         # self.prompt_dict = {1:'Positive', 0:'Negative'}
         self.choice = ["True", "False"]
-        # val_content = []
-        # dev_content = []
-        # # 将数据集里的所有题目填进一个列表中
-        # for sub in courses:
-        #     dataset = load_dataset(dataset_name, sub)
-        #     for k in range(len(dataset["validation"])):
-        #         val_content.append(dataset["validation"][k])
-        #     for k_dev in range(len(dataset["dev"])):
-        #         dev_content.append(dataset["dev"][k_dev])
         self.dataset,self.dev_dataset = self.load_datasets_parallel(courses=courses,dataset_name=dataset_name)
 
     def process_dataset(self,dataset_name, sub, val_content, dev_content):
@@ -1013,6 +961,7 @@ class MMLUDataset(Dataset):
     def __generate_prompt__(self, ban_index=-1):
         train_sample = random.sample(self.dev_dataset, self.item_size)
         prompt = [random.choice(self.prompt_heads) + "\n\n"]
+        # prompt = [random.choice(self.prompt_heads) + cource + ".\n\n"]
         for item in train_sample:
             choice = item["choices"]  # list of choices, number of choices varies
             # choice in prompt should have prefix of ABCE according to the number of choices
@@ -1127,7 +1076,7 @@ class ChIDDataset(Dataset):
             self.dataset = list(map(lambda x: json.loads(x), data))
         self.first_line = (
             # "在这个任务中，你将面对一些不完整的句子，其中句子中成语被'#idiom#'取代，以成语完形填空形式实现，从给定的七个选项,选择正确答案：\n"
-            "阅读以下文章，并选择一个合适的成语"
+            "阅读以下文章，并选择一个合适的成语\n"
         )
         self.item_size = item_size
 
@@ -1142,8 +1091,7 @@ class ChIDDataset(Dataset):
 
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
-            prompt += "不完整的句子：" + str(sample["content"]) + "\n"
-            prompt += "选项：" + "\n"
+            prompt += "文本：" + str(sample["content"]) + "\n"
             prompt += "A." + str(sample["candidates"][0]) + "\n"
             prompt += "B." + str(sample["candidates"][1]) + "\n"
             prompt += "C." + str(sample["candidates"][2]) + "\n"
@@ -1164,8 +1112,7 @@ class ChIDDataset(Dataset):
         entry = self.dataset[idx]
         answer = chr(ord("A") + int(entry["answer"]))
 
-        prompt += "不完整的句子：" + str(entry["content"]) + "\n"
-        prompt += "选项:" + "\n"
+        prompt += "文本：" + str(entry["content"]) + "\n"
         prompt += "A." + str(entry["candidates"][0]) + "\n"
         prompt += "B." + str(entry["candidates"][1]) + "\n"
         prompt += "C." + str(entry["candidates"][2]) + "\n"
@@ -1216,7 +1163,7 @@ class CSLDataset(Dataset):
         indexes=["0","1"]
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
-            prompt += "摘要：" + str(sample["abst"]) + "\n"
+            prompt += "文本：" + str(sample["abst"]) + "\n"
             prompt += "关键词：" + str(sample["keyword"]) + "\n"
             random.shuffle(indexes)
             prompt += choices[indexes.index("0")] + "." + str(self.prompt_dict["0"]) + "\n"
@@ -1239,7 +1186,7 @@ class CSLDataset(Dataset):
         # answer = str(self.prompt_dict[str(entry["label"])])
         answer = choices[indexes.index(str(entry["label"]))]
 
-        prompt += "摘要：" + str(entry["abst"]) + "\n"
+        prompt += "文本：" + str(entry["abst"]) + "\n"
         prompt += "关键词：" + str(entry["keyword"]) + "\n"
         prompt += choices[indexes.index("0")] + "." + str(self.prompt_dict["0"]) + "\n"
         prompt += choices[indexes.index("1")] + "." + str(self.prompt_dict["1"]) + "\n"
