@@ -77,6 +77,7 @@ class Llama2(BaseLLM):
             ]
             choice_tokenss.append(choice_tokens)
         queries = [preprocess(q) for q in queries]
+        print("queries:\n"+queries[0]+"<end here>")
         # print('>>>queries:\n',queries[0],'\nqueries end<<<')
         # test_outputs=[self.tokenizer.encode(q, add_special_tokens=False) for q in queries]
         # for o in test_outputs:

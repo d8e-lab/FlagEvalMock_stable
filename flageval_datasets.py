@@ -6,6 +6,7 @@ import datasets
 import pdb
 import os
 import threading
+import re
 from datasets import load_dataset
 from torch.utils.data import Dataset, DataLoader
 
@@ -177,7 +178,7 @@ class LinkSoulCEvalDataset(CEvalDataset):
 
 class BUSTMDataset(Dataset):
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
-        # ceval_path: ./BUSTM文件夹路径
+        
         dev_path = os.path.join(ceval_path,'dev_few_all.json')
         test_path = os.path.join(ceval_path,'test_public.json')
         # train集不读取
@@ -211,9 +212,9 @@ class BUSTMDataset(Dataset):
             prompt += f"\n文本:"
             prompt += f"\n文本1: {sentence1}"
             prompt += f"\n文本2: {sentence2}"
-            prompt += f"\nA:相似"
-            prompt += f"\nB:不相似"
-            prompt += f"\n答案:{self.prompt_dict[label]}\n"
+            prompt += f"\nA. 相似"
+            prompt += f"\nB. 不相似"
+            prompt += f"\n答案: {self.prompt_dict[label]}\n"
         return prompt
 
     def __getitem__(self, index):
@@ -227,9 +228,9 @@ class BUSTMDataset(Dataset):
         prompt += f"\n文本:"
         prompt += f"\n文本1: {sentence1}"
         prompt += f"\n文本2: {sentence2}"
-        prompt += f"\nA:属于"
-        prompt += f"\nB:不属于"
-        prompt += f"\n答案:\n"
+        prompt += f"\nA. 属于"
+        prompt += f"\nB. 不属于"
+        prompt += f"\n答案: \n"
         sample = {"prompt": prompt, "answer": self.prompt_dict[answer]}
         return sample
 
@@ -275,7 +276,7 @@ class OCNLIDataset(Dataset):
             prompt += f"\n文本:"
             prompt += f"\n文本1: {sentence1}"
             prompt += f"\n文本2: {sentence2}"
-            prompt += f"\nA. 冲突"
+            prompt += f"\nA: 冲突"
             prompt += f"\nB: 中立"
             prompt += f"\nC: 蕴含"
             prompt += f"\n答案: {self.prompt_dict[label]}\n"
@@ -307,10 +308,7 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
         self.name = "GAOKAO2023"
         file_name = os.path.basename(ceval_path)
         subject = file_name.split('_')[1]
-        # subject_map = {"Math":"数学","English":"英语","Chinese":"语文","Political":"政治","Biology":"生物","Geography":"地理","Chemistry":"化学","History":"历史","Physics":"物理"}
-        # self.first_line = "这个任务是关于"+subject_map[subject]+"的一组问题，请从给出的A、B、C、D四个选项中，选出其中的正确答案。\n"
-        # self.first_line = "这个任务是关于一组问题，请从给出的A、B、C、D四个选项中，选出其中的正确答案。请回答'A'或'B'或'C'或'D'\n"
-        self.first_line = "以下是2023 年高考的选择题（附答案），请从四个选项里选择正确答案."
+        self.first_line = "以下是2023 年高考的选择题（附答案），请从四个选项里选择正确答案.\n"
         self.item_size = item_size
 
     def __len__(self):
@@ -324,9 +322,14 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
 
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
-            prompt += "题目：" + str(sample["question"]) + "\n"
-            prompt += str(sample["choices"]) + "\n"
-            prompt += "答案：" + str(sample["answer"][0]) + "\n"
+            question = re.sub(r'[0-9]+．[ ]*（[ ]*[0-9]+分[ ]*）[ ]*','',str(sample["question"]))
+            question = re.sub(r'[0-9]+.[ ]*\([ ]*[0-9]+[ ]+分[ ]*\)[ ]*','',question)
+            question = re.sub(r'^[0-9]+[ ]*．[ ]*','',question)
+            question = re.sub(r'^[0-9]+[ ]*.[ ]*','',question)
+            question = re.sub(r'(?<![.\?!:"\'…。（）\)])\n', '', question)
+            prompt += "题目: " + question + "\n"
+            prompt += str(sample["choices"])
+            prompt += "答案: " + str(sample["answer"][0]) + "\n"
             prompt += "\n"
 
         return prompt
@@ -337,10 +340,14 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
         prompt = self.__generate_prompt__(idx)
         entry = self.dataset[idx]
         answer = entry["answer"][0]
-
-        prompt += "题目：" + str(entry["question"]) + "\n"
+        question = re.sub(r'[0-9]+．[ ]*（[ ]*[0-9]+分[ ]*）[ ]*','',str(entry["question"]))
+        question = re.sub(r'[0-9]+.[ ]*\([ ]*[0-9]+[ ]+分[ ]*\)[ ]*','',question)
+        question = re.sub(r'^[0-9]+[ ]*．[ ]*','',question)
+        question = re.sub(r'^[0-9]+[ ]*.[ ]*','',question)
+        question = re.sub(r'(?<![.\?!:"\'…。（）\)])\n', '', question)
+        prompt += "题目: " + question + "\n"
         prompt += str(entry["choices"]) + "\n"
-        prompt += "答案：" + "\n"
+        prompt += "答案: " + "\n"
         prompt += "\n"
 
         sample = {"prompt": prompt, "answer": answer}
@@ -461,11 +468,7 @@ class TruthfulQADataset(Dataset):
         self.dataset = datasets.load_dataset("truthful_qa", "multiple_choice")[
             "validation"
         ]
-        # print(datasets.load_dataset("truthful_qa", "multiple_choice"))
         self.name = "TruthfulQA"
-        # self.first_line = "The following are some questions about truthfulness. Please choose the most authentic answer from the options.\n\n"
-        # self.first_line = "The following are multiple choice questions (with answers) about truthfulness. Please choose the most authentic answer from the options.\n\n"
-        # self.first_line = "The following are multiple choice questions (with answers) about truthfulness.\n\n"
         self.item_size = item_size
 
     def __len__(self):
@@ -493,7 +496,7 @@ class TruthfulQADataset(Dataset):
                 )
                 + "\n"
             )
-            prompt += "Answer:" + ALPHABET[new_answer_index] + "\n"
+            prompt += "Answer: " + ALPHABET[new_answer_index] + "\n"
             prompt += "\n"
         return prompt
 
@@ -518,7 +521,7 @@ class TruthfulQADataset(Dataset):
             for j, v in enumerate(sample["mc2_targets"]["labels"]):
                 if v == 1:
                     ans.append(ALPHABET[int(j)])
-            prompt += "Answer:" + ", ".join(ans) + "\n"
+            prompt += "Answer: " + ", ".join(ans) + "\n"
             prompt += "\n"
         return prompt
 
@@ -542,7 +545,7 @@ class TruthfulQADataset(Dataset):
             )
             + "\n"
         )
-        prompt += "Answer:" +"\n"
+        prompt += "Answer: " +"\n"
         prompt += "\n"
         answer=ALPHABET[new_answer_index]
         sample = {"prompt": prompt, "answer": answer}
@@ -868,63 +871,63 @@ class MMLUDataset(Dataset):
         # dataset = load_dataset("tasksource/mmlu")
         dataset_name = "tasksource/mmlu"
         courses = [
-            "abstract algebra",
+            "abstract_algebra",
             "anatomy",
             "astronomy",
-            "business ethics",
-            "clinical knowledge",
-            "college biology",
-            "college chemistry",
-            "college computer science",
-            "college mathematics",
-            "college medicine",
-            "college physics",
-            "computer security",
-            "conceptual physics",
+            "business_ethics",
+            "clinical_knowledge",
+            "college_biology",
+            "college_chemistry",
+            "college_computer_science",
+            "college_mathematics",
+            "college_medicine",
+            "college_physics",
+            "computer_security",
+            "conceptual_physics",
             "econometrics",
-            "electrical engineering",
-            "elementary mathematics",
-            "formal logic",
-            "global facts",
-            "high school biology",
-            "high school chemistry",
-            "high school computer science",
-            "high school european history",
-            "high school geography",
-            "high school government and politics",
-            "high school macroeconomics",
-            "high school mathematics",
-            "high school microeconomics",
-            "high school physics",
-            "high school psychology",
-            "high school statistics",
-            "high school us history",
-            "high school world history",
-            "human aging",
-            "human sexuality",
-            "international law",
+            "electrical_engineering",
+            "elementary_mathematics",
+            "formal_logic",
+            "global_facts",
+            "high_school_biology",
+            "high_school_chemistry",
+            "high_school_computer_science",
+            "high_school_european_history",
+            "high_school_geography",
+            "high_school_government_and_politics",
+            "high_school_macroeconomics",
+            "high_school_mathematics",
+            "high_school_microeconomics",
+            "high_school_physics",
+            "high_school_psychology",
+            "high_school_statistics",
+            "high_school_us_history",
+            "high_school_world_history",
+            "human_aging",
+            "human_sexuality",
+            "international_law",
             "jurisprudence",
-            "logical fallacies",
-            "machine learning",
+            "logical_fallacies",
+            "machine_learning",
             "management",
             "marketing",
-            "medical genetics",
+            "medical_genetics",
             "miscellaneous",
-            "moral disputes",
-            "moral scenarios",
+            "moral_disputes",
+            "moral_scenarios",
             "nutrition",
             "philosophy",
             "prehistory",
-            "professional accounting",
-            "professional law",
-            "professional medicine",
-            "professional psychology",
-            "public relations",
-            "security studies",
+            "professional_accounting",
+            "professional_law",
+            "professional_medicine",
+            "professional_psychology",
+            "public_relations",
+            "security_studies",
             "sociology",
-            "us foreign policy",
+            "us_foreign_policy",
             "virology",
-            "world religions",
+            "world_religions",
         ]
         self.name = "MMLU"
         self.prompt_heads=["The following are multiple choice questions (with answers) about "]# append with courses+'.'
@@ -1062,7 +1065,7 @@ class ChIDDataset(Dataset):
     """
 
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
-        # ceval_path: ./BUSTM文件夹路径
+        
         dev_path = os.path.join(ceval_path,'dev_few_all.json')
         test_path = os.path.join(ceval_path,'test_public.json')
         # train集不读取
@@ -1134,7 +1137,7 @@ class CSLDataset(Dataset):
 
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
         self.name = "CSL"
-        # ceval_path: ./BUSTM文件夹路径
+        
         dev_path = os.path.join(ceval_path,'dev_few_all.json')
         test_path = os.path.join(ceval_path,'test_public.json')
         # train集不读取
@@ -1146,7 +1149,7 @@ class CSLDataset(Dataset):
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
         # self.first_line = "在此任务中，将给出一段摘要与几个关键词，根据给出的摘要与关键词的关系，判断关键词是真实还是伪造，关键词为真实时请回答'真实'，关键词为伪造时请回答'伪造'：\n"
-        self.first_line = "摘要关键词判别"
+        self.first_line = "摘要关键词判别\n\n"
         self.item_size = item_size
         self.prompt_dict = {"1": "正确", "0": "错误"}
         self.choice_dict = {"1": "A", "0": "B"}
@@ -1163,13 +1166,13 @@ class CSLDataset(Dataset):
         indexes=["0","1"]
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
-            prompt += "文本：" + str(sample["abst"]) + "\n"
+            prompt += "文本: " + str(sample["abst"]) + "\n"
             prompt += "关键词：" + str(sample["keyword"]) + "\n"
             random.shuffle(indexes)
-            prompt += choices[indexes.index("0")] + "." + str(self.prompt_dict["0"]) + "\n"
-            prompt += choices[indexes.index("1")] + "." + str(self.prompt_dict["1"]) + "\n"
+            prompt += choices[indexes.index("0")] + ". " + str(self.prompt_dict["0"]) + "\n"
+            prompt += choices[indexes.index("1")] + ". " + str(self.prompt_dict["1"]) + "\n"
             # prompt += "答案：" + str(self.prompt_dict[str(sample["label"])]) + "\n"
-            prompt += "答案：" + choices[indexes.index(str(sample["label"]))] + "\n"
+            prompt += "答案: " + choices[indexes.index(str(sample["label"]))] + "\n"
             prompt += "\n"
 
         return prompt
@@ -1186,11 +1189,11 @@ class CSLDataset(Dataset):
         # answer = str(self.prompt_dict[str(entry["label"])])
         answer = choices[indexes.index(str(entry["label"]))]
 
-        prompt += "文本：" + str(entry["abst"]) + "\n"
+        prompt += "文本: " + str(entry["abst"]) + "\n"
         prompt += "关键词：" + str(entry["keyword"]) + "\n"
-        prompt += choices[indexes.index("0")] + "." + str(self.prompt_dict["0"]) + "\n"
-        prompt += choices[indexes.index("1")] + "." + str(self.prompt_dict["1"]) + "\n"
-        prompt += "答案：" + "\n"
+        prompt += choices[indexes.index("0")] + ". " + str(self.prompt_dict["0"]) + "\n"
+        prompt += choices[indexes.index("1")] + ". " + str(self.prompt_dict["1"]) + "\n"
+        prompt += "答案: " + "\n"
         prompt += "\n"
 
         sample = {"prompt": prompt, "answer": answer}
@@ -1203,7 +1206,7 @@ class CLUEWSCDataset(Dataset):
     """
 
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
-        # ceval_path: ./BUSTM文件夹路径
+        
         dev_path = os.path.join(ceval_path,'dev_few_all.json')
         test_path = os.path.join(ceval_path,'test_public.json')
         # train集不读取
@@ -1215,7 +1218,7 @@ class CLUEWSCDataset(Dataset):
         with open(test_path, "r", encoding="utf-8") as f:
             data = f.readlines()
             self.dataset = list(map(lambda x: json.loads(x), data))
-        self.first_line = "代词是否指向给定名词短语："
+        self.first_line = "代词是否指向给定名词短语：\n"
         self.item_size = item_size
         self.prompt_dict = {"true": "A", "false": "B"}
 
@@ -1232,9 +1235,9 @@ class CLUEWSCDataset(Dataset):
             # Add the sample information to the prompt
             prompt += "段落：" + str(sample["text"]) + "\n"
             prompt += ("问题："
-                       +str(sample["target"]["span1_text"])+str(sample["target"]["span1_index"])
+                       +str(sample["target"]["span1_text"])+'（'+str(sample["target"]["span1_index"])+'）'
                        +"是指代"
-                       +str(sample["target"]["span1_text"])+str(sample["target"]["span1_index"])
+                       +str(sample["target"]["span2_text"])+'（'+str(sample["target"]["span2_index"])+'）'
                        +"吗\n"
                        +"A. 正确\n"
                        +"B. 错误\n")
@@ -1252,9 +1255,9 @@ class CLUEWSCDataset(Dataset):
 
         prompt += "" + str(entry["text"]) + "\n"
         prompt += ("问题："
-                    +str(entry["target"]["span1_text"])+str(entry["target"]["span1_index"])
+                    +str(entry["target"]["span1_text"])+'（'+str(entry["target"]["span1_index"])+'）'
                     +"是指代"
-                    +str(entry["target"]["span1_text"])+str(entry["target"]["span1_index"])
+                    +str(entry["target"]["span2_text"])+'（'+str(entry["target"]["span2_index"])+'）'
                     +"吗\n"
                     +"A. 正确\n"
                     +"B. 错误\n")
