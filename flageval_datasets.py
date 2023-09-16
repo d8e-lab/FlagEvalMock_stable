@@ -23,7 +23,6 @@ class CEvalDataset(Dataset):
         dev_directory = directory.replace('/val','/dev')
         root,dirs,files= next(iter(os.walk(dev_directory)))
         file = next(iter(files))
-        # pdb.set_trace()
         file = os.path.join(dev_directory,file)
         with open(file,"r",encoding="utf-8") as file:
             self.dev_dataset = json.load(file)
@@ -382,7 +381,6 @@ class RAFTDataset(Dataset):
         i = 0
         for sub in subset_name:
             d = datasets.load_dataset("ought/raft", sub)
-            # pdb.set_trace()
             lb = d["train"].features["Label"]
             self.sub2label[sub] = lb
             for split in d:
@@ -395,7 +393,6 @@ class RAFTDataset(Dataset):
                     self.sub2ind.setdefault(sub, []).append(i)
                     i += 1
 
-        # pdb.set_trace()
     def __len__(self):
         return len(self.dataset)
 
@@ -407,7 +404,6 @@ class RAFTDataset(Dataset):
             if ban_index in inds:
                 sub_name = n
                 break
-        # pdb.set_trace()
         # ban_ind->sub_name->定题型?
         prompt = self.first_line+sub_name+".\n"
         # 根据subset_name获取文本分类的答案标签，如【1.ADE-related 2.not ADE-related】,
@@ -448,7 +444,6 @@ class RAFTDataset(Dataset):
         answer = labels[item["Label"]]
         # sample = {"prompt": prompt, "answer": answer, "labels": labels}
         sample = {"prompt": prompt, "answer": answer}
-        # pdb.set_trace()
         return sample
     def generate_labels(self,labels):
         choiceses=[]
@@ -1027,7 +1022,6 @@ class CMMLUDataset(Dataset):
         samples = random.sample(self.dataset, self.item_size)
         # Initialize the prompt string
         prompt = self.first_line
-
         for i, sample in enumerate(samples):
             # Add the sample information to the prompt
             prompt += "问题：" + str(sample["Question"]) + "\n"
@@ -1046,7 +1040,6 @@ class CMMLUDataset(Dataset):
         prompt = self.__generate_prompt__(idx)
         entry = self.dataset[idx]
         answer = entry["Answer"]
-
         prompt += "问题：" + str(entry["Question"]) + "\n"
         prompt += "A." + str(entry["choices"][0]) + "\n"
         prompt += "B." + str(entry["choices"][1]) + "\n"
