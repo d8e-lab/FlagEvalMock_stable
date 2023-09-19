@@ -227,8 +227,8 @@ class BUSTMDataset(Dataset):
         prompt += f"\n文本:"
         prompt += f"\n文本1: {sentence1}"
         prompt += f"\n文本2: {sentence2}"
-        prompt += f"\nA. 属于"
-        prompt += f"\nB. 不属于"
+        prompt += f"\nA. 相似"
+        prompt += f"\nB. 不相似"
         prompt += f"\n答案: \n"
         sample = {"prompt": prompt, "answer": self.prompt_dict[answer]}
         return sample
