@@ -106,7 +106,7 @@ class Llama2(BaseLLM):
                 "temperature": 0.1,
             } 
             # 去除token_type_ids
-            inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
             outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
             
             outputs = outputs[:,-1*nt:]
@@ -182,6 +182,7 @@ class Llama_colossalai:
             results = self.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
+        print("outputs: "+results[0])
         if dataset_name in ['MMLU','RAFT','C-Eval']:
             results = [postprocess_(result,self.name) for result in results]
         else:
