@@ -856,10 +856,9 @@ class BoolQDataset(Dataset):
         sample = {"prompt": prompt, "answer": answer}
         return sample
 
-
 class MMLUDataset(Dataset):
     """MMLU dataset from huggingface
-    说明：
+    说明：施工完毕，可放心食用（
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
@@ -926,39 +925,57 @@ class MMLUDataset(Dataset):
         ]
         self.name = "MMLU"
         self.prompt_heads=["The following are multiple choice questions (with answers) about "]# append with courses+'.'
-        # 数据集文件是arrow文件，所以需要用datasets.load_from_disk，folder_path是数据集的文件夹路径
         self.item_size = item_size
-        # self.prompt_dict = {1:'Positive', 0:'Negative'}
         self.choice = ["True", "False"]
-        self.dataset,self.dev_dataset = self.load_datasets_parallel(courses=courses,dataset_name=dataset_name)
+        self.dataset,self.dev_dataset,self.sub2ind = self.load_datasets_parallel(courses=courses,dataset_name=dataset_name)
 
-    def process_dataset(self,dataset_name, sub, val_content, dev_content):
+    def process_dataset(self,dataset_name, sub, val_content, dev_content, sub2ind):
         dataset = load_dataset(dataset_name, sub)
         for k in range(len(dataset["validation"])):
+            self.val_content_lock.acquire()
             val_content.append(dataset["validation"][k])
+            sub2ind.setdefault(sub,[]).append(self.i)
+            self.i+=1
+            self.val_content_lock.release()
+
         for k_dev in range(len(dataset["dev"])):
             dev_content.append(dataset["dev"][k_dev])
+
     def load_datasets_parallel(self,courses, dataset_name):
+        self.sub2ind_lock = threading.Lock()
+        self.val_content_lock = threading.Lock()
+
+        self.i = 0
         val_content = []
         dev_content = []
-
+        sub2ind = {}
         threads = []
         for sub in courses:
-            thread = threading.Thread(target=self.process_dataset, args=(dataset_name, sub, val_content, dev_content))
+            thread = threading.Thread(target=self.process_dataset, args=(dataset_name, sub, val_content, dev_content, sub2ind))
             thread.start()
             threads.append(thread)
 
         # Wait for all threads to finish
         for thread in threads:
             thread.join()
-        return val_content, dev_content
+        return val_content, dev_content, sub2ind
     
     def __len__(self):
         return len(self.dataset)
 
-    def __generate_prompt__(self, ban_index=-1):
-        train_sample = random.sample(self.dev_dataset, self.item_size)
-        prompt = [random.choice(self.prompt_heads) + "\n\n"]
+    def __generate_prompt__(self, val_question_index=-1):
+        # pdb.set_trace()
+        sub_name = ""
+        for sub,indexs in self.sub2ind.items():
+            # print("val_question_index: ",val_question_index)
+            # print("indexs: ",indexs)
+            # assert val_question_index in indexs
+            if val_question_index in indexs:
+                sub_name = sub
+                break
+        assert sub_name != ""
+        train_sample = random.sample(self.dev_dataset,self.item_size)
+        prompt = [random.choice(self.prompt_heads) + sub_name + ".\n\n"]
         # prompt = [random.choice(self.prompt_heads) + cource + ".\n\n"]
         for item in train_sample:
             choice = item["choices"]  # list of choices, number of choices varies
@@ -1004,7 +1021,6 @@ class MMLUDataset(Dataset):
 
         sample = {"prompt": prompt, "answer": Flag}
         return sample
-
 
 class CMMLUDataset(Dataset):
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
