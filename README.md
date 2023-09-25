@@ -41,6 +41,42 @@ Example usage:
 python script_name.py --model-name llama2 --dataset-names "Dataset1, Dataset2" --batch-size 8
 ```
 
+You can use the following shell command to automatically evaluate multiple weight paths in the specified directory using multiple GPUs:
+```shell
+MODEL=<Your Model Name>
+directory=/path/to/direction
+
+# Initialize an empty list
+file_list=()
+
+# Use the find command to search for directory files in the current directory, excluding the specified directory itself
+while IFS= read -r -d $'\0' file; do
+  # Exclude the path of the specified directory itself
+  if [ "$file" != "$directory" ]; then
+    file_list+=("$file")
+  fi
+done < <(find "$directory" -maxdepth 1 -type d -print0)
+
+mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})/"
+
+# Evaluate all weight files in the directory
+for LLAMA_BASE in "${file_list[@]}"; do
+{
+    mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})"
+    current_datetime=$(date +"%m%d_%H_%M_%S")
+    CUDA_VISIBLE_DEVICES=1,2,3,4,6,7
+    torchrun --nproc-per-node 6 main_v2dist.py --dataset-names="ALL" \
+        --model-name $MODEL \
+        --model-path $LLAMA_BASE \
+        --tokenizer-path $LLAMA_BASE \
+        --batch-size 1 \
+        --verbose \
+        >> "./logs/${MODEL}/$(basename ${LLAMA_BASE})/${current_datetime}.log" 2>&1
+} done
+```
+The purpose of this script is to evaluate all weight files in the specified directory. It performs model evaluation for each weight file and stores the results in log files. Make sure to define the MODEL and directory variables before running the script and modify their values according to your requirements. This script sequentially evaluates the weight files listed in the specified directory and stores the results in log files.
+
+
 ## Output
 
 The script will print the dataset name, usage of logits, total accuracy, and time cost. It will also save the results in a CSV file if the `--no-save` option is not used.
