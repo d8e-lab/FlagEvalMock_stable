@@ -41,7 +41,7 @@ Example usage:
 python script_name.py --model-name llama2 --dataset-names "Dataset1, Dataset2" --batch-size 8
 ```
 
-You can use the following shell command to automatically evaluate multiple weight paths in the specified directory using multiple GPUs:
+You can use the following shell command to automatically evaluate multiple model paths in the specified directory using multiple GPUs:
 ```shell
 MODEL=<Your Model Name>
 directory=/path/to/direction
@@ -59,7 +59,7 @@ done < <(find "$directory" -maxdepth 1 -type d -print0)
 
 mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})/"
 
-# Evaluate all weight files in the directory
+# Evaluate all model files in the directory
 for LLAMA_BASE in "${file_list[@]}"; do
 {
     mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})"
@@ -74,7 +74,8 @@ for LLAMA_BASE in "${file_list[@]}"; do
         >> "./logs/${MODEL}/$(basename ${LLAMA_BASE})/${current_datetime}.log" 2>&1
 } done
 ```
-The purpose of this script is to evaluate all weight files in the specified directory. It performs model evaluation for each weight file and stores the results in log files. Make sure to define the MODEL and directory variables before running the script and modify their values according to your requirements. This script sequentially evaluates the weight files listed in the specified directory and stores the results in log files.
+The purpose of this script is to evaluate all model files in the specified directory. It performs model evaluation for each model file and stores the results in log files. Make sure to define the MODEL and directory variables before running the script and modify their values according to your requirements. This script sequentially evaluates the model files listed in the specified directory and stores the results in log files.  
+Please note that if your model path is "/data/LLM/Llama-2-7b-hf/", your directory variable should be set to "/data/LLM/", and this directory should not contain any non-model directories.
 
 
 ## Output
