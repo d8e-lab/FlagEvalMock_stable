@@ -848,7 +848,7 @@ class MMLUDataset(Dataset):
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         # dataset = load_dataset("tasksource/mmlu")
-        dataset_name = "/data/LLM/flagevalmock/mmlu"
+        dataset_path = "/data/LLM/flagevalmock/mmlu"
         courses = [
             "abstract_algebra",
             "anatomy",
@@ -912,10 +912,10 @@ class MMLUDataset(Dataset):
         self.prompt_heads=["The following are multiple choice questions (with answers) about "]# append with courses+'.'
         self.item_size = item_size
         self.choice = ["True", "False"]
-        self.dataset,self.dev_dataset,self.sub2ind = self.load_datasets_parallel(courses=courses,dataset_name=dataset_name)
+        self.dataset,self.dev_dataset,self.sub2ind = self.load_datasets_parallel(courses=courses,dataset_path=dataset_path)
 
-    def process_dataset(self,dataset_name, sub, val_content, dev_content, sub2ind):
-        dataset = load_dataset(dataset_name, sub)
+    def process_dataset(self,dataset_path, sub, val_content, dev_content, sub2ind):
+        dataset = load_dataset(dataset_path, sub)
         for k in range(len(dataset["validation"])):
             self.val_content_lock.acquire()
             val_content.append(dataset["validation"][k])
@@ -926,7 +926,7 @@ class MMLUDataset(Dataset):
         for k_dev in range(len(dataset["dev"])):
             dev_content.append(dataset["dev"][k_dev])
 
-    def load_datasets_parallel(self,courses, dataset_name):
+    def load_datasets_parallel(self,courses, dataset_path):
         self.sub2ind_lock = threading.Lock()
         self.val_content_lock = threading.Lock()
 
@@ -936,7 +936,7 @@ class MMLUDataset(Dataset):
         sub2ind = {}
         threads = []
         for sub in courses:
-            thread = threading.Thread(target=self.process_dataset, args=(dataset_name, sub, val_content, dev_content, sub2ind))
+            thread = threading.Thread(target=self.process_dataset, args=(dataset_path, sub, val_content, dev_content, sub2ind))
             thread.start()
             threads.append(thread)
 
