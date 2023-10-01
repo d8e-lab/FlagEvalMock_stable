@@ -380,7 +380,7 @@ class RAFTDataset(Dataset):
         self.dataset = []
         i = 0
         for sub in subset_name:
-            d = datasets.load_dataset("ought/raft", sub)
+            d = datasets.load_dataset("/data/LLM/flagevalmock/raft", sub)
             lb = d["train"].features["Label"]
             self.sub2label[sub] = lb
             for split in d:
@@ -460,7 +460,7 @@ class TruthfulQADataset(Dataset):
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
-        self.dataset = datasets.load_dataset("truthful_qa", "multiple_choice")[
+        self.dataset = datasets.load_dataset("/data/LLM/flagevalmock/truthful_qa", "multiple_choice")[
             "validation"
         ]
         self.name = "TruthfulQA"
@@ -625,21 +625,6 @@ class TNEWSDataset(Dataset):
         self.first_line = "判断以下新闻属于哪一个类别\n"
         self.item_size = item_size
         self.prompt_dict = {
-            # "news_house": "A",
-            # "news_entertainment": "B",
-            # "news_sports": "C",
-            # "news_game": "D",
-            # "news_military": "E",
-            # "news_culture": "F",
-            # "news_finance": "G",
-            # "news_agriculture": "H",
-            # "news_world": "I",
-            # "news_travel": "J",
-            # "news_tech": "K",
-            # "news_story": "L",
-            # "news_stock": "M",
-            # "news_edu": "N",
-            # "news_car": "O",
             "news_story": "A",
             "news_culture": "B",
             "news_entertainment": "C",
@@ -730,8 +715,8 @@ class IMDBDataset(Dataset):
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
-        self.dataset = datasets.load_dataset("imdb")["test"]
-        self.train_dataset = datasets.load_dataset("imdb")["train"]
+        self.dataset = datasets.load_dataset("/data/LLM/flagevalmock/imdb")["test"]
+        self.train_dataset = datasets.load_dataset("/data/LLM/flagevalmock/imdb")["train"]
 
         self.name = "IMDB"
         # self.first_line = "In this task, you will be presented with some text. Please determine whether the text is positive or negative.Please answer with 'Positive' or 'Negative'.\n"
@@ -787,7 +772,7 @@ class BoolQDataset(Dataset):
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
-        dataset = datasets.load_dataset("boolq")
+        dataset = datasets.load_dataset("/data/LLM/flagevalmock/boolq")
         # print(dataset)
         self.name = "BoolQ"
         self.prompt_heads = [""]
@@ -863,7 +848,7 @@ class MMLUDataset(Dataset):
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         # dataset = load_dataset("tasksource/mmlu")
-        dataset_name = "tasksource/mmlu"
+        dataset_name = "/data/LLM/flagevalmock/mmlu"
         courses = [
             "abstract_algebra",
             "anatomy",
@@ -1275,3 +1260,71 @@ class CLUEWSCDataset(Dataset):
 
         sample = {"prompt": prompt, "answer": answer}
         return sample
+
+# class FakeNewsDataset(Dataset):
+#     dummy_message = {
+#         "system": "In this task, you will be presented with a statement. Please determine the truthfulness of the statement by selecting one of the options: A. True, B. Mostly True, C. Barely True, D. Half True, E. False, F. Pants on Fire.\n",
+#         "conversations": [
+#             {
+#                 "from": "human",
+#                 "value": "Passage: <Statement> \n Options: A. True B. Mostly True C. Barely True D. Half True E. False F. Pants on Fire \n Answer: ",
+#             },
+#             {"from": "gpt", "value": "<Answer>"},
+#         ],
+#     }
+
+#     def __init__(self,tokenizer, data_path="/mnt/SFT_store/xxw/Chinese-Llama-2-7b/liar_dataset/train.json", item_size=3):
+#         with open(data_path, 'r', encoding='utf-8') as f:
+#             self.dataset = json.load(f)
+#         self.name = "FakeNews"
+#         self.first_line = self.dummy_message['system']
+#         self.item_size = item_size
+#         self.tokenizer = tokenizer
+        
+#     def __len__(self):
+#         return len(self.dataset)
+
+#     def __generate_prompt__(self, ban_index=-1):
+#         idns = random.sample(range(0, len(self.dataset)), self.item_size)
+#         messages = []
+#         for idx in idns:
+#             entry = self.dataset[idx]
+#             question = entry["Question"]
+#             # options = ' '.join([f"{k}. {v}" for k, v in entry["Options"].items()])
+#             options = ' '.join([f"{idx}. {val}" for idx, val in enumerate(entry["Options"], start=1)])
+#             answer = entry["Answer"]
+#             formatted_string = f"Passage:\n{question}\nOptions: {options}\nAnswer: "
+#             messages.append(formatted_string)
+#             messages.append(f"{answer}")
+#         return messages
+
+#     def __getitem__(self, index):
+#         idx = index
+#         prompt = self.__generate_prompt__(idx)
+#         entry = self.dataset[idx]
+#         question = entry["Question"]
+#         # options = ' '.join([f"{k}. {v}" for k, v in entry["Options"].items()])
+#         options = ' '.join([f"{idx}. {val}" for idx, val in enumerate(entry["Options"], start=1)])
+
+#         answer = entry["Answer"]
+#         formatted_string = f"Passage:\n{question}\nOptions: {options}\nAnswer: "
+#         system = self.first_line
+#         if isinstance(prompt, str):
+#             prompt = prompt + "\n\n" + formatted_string
+#             human = prompt
+#             gpt = answer
+#             messages = [
+#                 {"from": "human", "value": human},
+#                 {"from": "gpt", "value": gpt},
+#             ]
+#         else:
+#             messages = []
+#             for i, x in enumerate(prompt):
+#                 if i % 2 == 0:
+#                     messages.append({"from": "human", "value": x})
+#                 else:
+#                     messages.append({"from": "gpt", "value": x})
+#             messages.append({"from": "human", "value": formatted_string})
+#             messages.append({"from": "gpt", "value": answer})
+#         item = {"conversations": messages, "system": system}
+#         return item
