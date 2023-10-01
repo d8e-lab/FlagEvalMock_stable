@@ -74,7 +74,12 @@ settings = list(itertools.product(use_logits, dataset_names))
 with torch.no_grad():
     for use_logits, dataset_name in settings:
         nt=ALL_NEW_TOKENS[dataset_name]
+        dataset_loader_time = time.time()
         dataset = get_dataset(dataset_name)
+        dataset_loader_cost = time.time() - dataset_loader_time
+        print(
+            f"{dataset_name}  Loading Time Cost: {dataset_loader_cost}"
+        )
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size)
         print("dataset_name:", dataset_name)
         total_correct = 0
