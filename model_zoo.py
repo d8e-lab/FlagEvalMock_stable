@@ -3,6 +3,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel, LlamaTo
 from transformers import LlamaForCausalLM, LlamaTokenizer
 from transformers.models.llama.configuration_llama import LlamaConfig
 import re
+
 # def preprocess(query):
 #     # query=query.strip("\n ：:")
 #     # query+=":"
@@ -83,11 +84,6 @@ class Llama2(BaseLLM):
             ]
             choice_tokenss.append(choice_tokens)
         queries = [preprocess(q) for q in queries]
-        # print("queries:\n"+queries[0]+"<end here>")
-        # print('>>>queries:\n',queries[0],'\nqueries end<<<')
-        # test_outputs=[self.tokenizer.encode(q, add_special_tokens=False) for q in queries]
-        # for o in test_outputs:
-        #     print("ENCODE LEN: " ,type(o), len(o))
         inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
         if use_logits:
             results = []
@@ -188,7 +184,26 @@ class Llama_colossalai:
         else:
             results = [postprocess(result,self.name) for result in results]
         return results
+    
+class Llama2_Lora(Llama2):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
+        # 为兼容用法 此处model_path实则为peft_path
+        from peft import PeftConfig,PeftModel
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
+        peft_config = PeftConfig.from_pretrained(model_path)
+        self.model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, 
+                                                          trust_remote_code=True)
+        self.model =  PeftModel.from_pretrained(self.model,model_path,).bfloat16().to(gpu_id)
+        if "chatglm2" not in self.name:
+            self.tokenizer.pad_token = self.tokenizer.bos_token
+            self.model.config.pad_token_id = self.model.config.bos_token_id
 
+# if __name__ == "__main__":
+    # model = Llama2_Lora(model_name="llama2_lora",model_path="/mnt/SFT_store/xxw/outputs/5peft/item0",tokenizer_path="/mnt/SFT_store/xxw/outputs/5peft/item0")
+ 
 MODEL_DICT = {
     # "chatglm2-6b": ChatGLM2,
     "chatglm2-6b": Llama2,
@@ -207,4 +222,5 @@ MODEL_DICT = {
     "Michael_base":Llama2,
     "Michael_v03":Llama2,
     "mac_llm":Llama_colossalai,
+    "llama2_lora":Llama2_Lora,
 }
