@@ -4,3 +4,5 @@ logs/*
 __pycache__/*
 evaluation_results/*
 copied_scripts/**/*
+env.sh
+
