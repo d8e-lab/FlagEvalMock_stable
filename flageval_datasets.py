@@ -380,7 +380,7 @@ class RAFTDataset(Dataset):
         self.dataset = []
         i = 0
         for sub in subset_name:
-            d = datasets.load_dataset("/data/LLM/flagevalmock/raft", sub)
+            d = datasets.load_dataset("/mnt/SFT_store/flagevalmock/raft", sub)
             lb = d["train"].features["Label"]
             self.sub2label[sub] = lb
             for split in d:
@@ -460,7 +460,7 @@ class TruthfulQADataset(Dataset):
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
-        self.dataset = datasets.load_dataset("/data/LLM/flagevalmock/truthful_qa", "multiple_choice")[
+        self.dataset = datasets.load_dataset("/mnt/SFT_store/flagevalmock/truthful_qa", "multiple_choice")[
             "validation"
         ]
         self.name = "TruthfulQA"
@@ -715,8 +715,8 @@ class IMDBDataset(Dataset):
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
-        self.dataset = datasets.load_dataset("/data/LLM/flagevalmock/imdb")["test"]
-        self.train_dataset = datasets.load_dataset("/data/LLM/flagevalmock/imdb")["train"]
+        self.dataset = datasets.load_dataset("/mnt/SFT_store/flagevalmock/imdb")["test"]
+        self.train_dataset = datasets.load_dataset("/mnt/SFT_store/flagevalmock/imdb")["train"]
 
         self.name = "IMDB"
         # self.first_line = "In this task, you will be presented with some text. Please determine whether the text is positive or negative.Please answer with 'Positive' or 'Negative'.\n"
@@ -772,7 +772,7 @@ class BoolQDataset(Dataset):
     """
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
-        dataset = datasets.load_dataset("/data/LLM/flagevalmock/boolq")
+        dataset = datasets.load_dataset("/mnt/SFT_store/flagevalmock/boolq")
         # print(dataset)
         self.name = "BoolQ"
         self.prompt_heads = [""]
@@ -848,7 +848,7 @@ class MMLUDataset(Dataset):
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         # dataset = load_dataset("tasksource/mmlu")
-        dataset_path = "/data/LLM/flagevalmock/mmlu"
+        dataset_path = "tasksource/mmlu"
         courses = [
             "abstract_algebra",
             "anatomy",

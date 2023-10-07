@@ -44,18 +44,18 @@ ALL_DATASET = [
     "BUSTM",
 ]
 ALL_DIRPATH_DIC = {
-    "BUSTM": "/data/LLM/flagevalmock/BUSTM",
-    "OCNLI": "/data/LLM/flagevalmock/OCNLI",
-    "EPRSTMT": "/data/LLM/flagevalmock/EPRSTMT",
-    "TNEWS": "/data/LLM/flagevalmock/TNEWS",
-    "ChID": "/data/LLM/flagevalmock/chid",
-    "CSL": "/data/LLM/flagevalmock/csl",
-    "CLUEWSC": "/data/LLM/flagevalmock/cluewsc",
+    "BUSTM": "/mnt/SFT_store/flagevalmock/BUSTM",
+    "OCNLI": "/mnt/SFT_store/flagevalmock/OCNLI",
+    "EPRSTMT": "/mnt/SFT_store/flagevalmock/EPRSTMT",
+    "TNEWS": "/mnt/SFT_store/flagevalmock/TNEWS",
+    "ChID": "/mnt/SFT_store/flagevalmock/chid",
+    "CSL": "/mnt/SFT_store/flagevalmock/csl",
+    "CLUEWSC": "/mnt/SFT_store/flagevalmock/cluewsc",
 }
 ALL_PATH_DIC = {
-    "C-Eval": "/data/LLM/flagevalmock/C-Eval/C-Eval-preprocess/val",
-    "GAOKAO2023": "/data/LLM/flagevalmock/GAOKAO2023",
-    "Chinese_MMLU": "/data/LLM/flagevalmock/cmmlu/dev",  # test 无标签
+    "C-Eval": "/mnt/SFT_store/flagevalmock/C-Eval/C-Eval-preprocess/val",
+    "GAOKAO2023": "/mnt/SFT_store/flagevalmock/GAOKAO2023",
+    "Chinese_MMLU": "/mnt/SFT_store/flagevalmock/cmmlu/dev",  # test 无标签
 }
 
 CLASSES = 24
