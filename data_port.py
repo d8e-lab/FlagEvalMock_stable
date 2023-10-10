@@ -82,7 +82,7 @@ ALL_NEW_TOKENS = {
     "MMLU": 1,
     "TruthfulQA": 1,
     "IMDB": 4,
-    "RAFT": 8, # 多个子集，选项数目不定
+    "RAFT": 16, # 多个子集，选项数目不定
     "Chinese_MMLU":1,
     "C-Eval":1,
     "GAOKAO2023":1,
