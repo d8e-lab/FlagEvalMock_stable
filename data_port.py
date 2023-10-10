@@ -88,7 +88,7 @@ ALL_NEW_TOKENS = {
     "GAOKAO2023":1,
     "CSL":4, # 1, # 形式很奇怪，看看咋回事
     "ChID":1,
-    "CLUEWSC":4, # 1, # 形式很奇怪，看看咋回事
+    "CLUEWSC":1, # 1, # 形式很奇怪，看看咋回事
     "EPRSTMT":4,
     "TNEWS":4,
     "OCNLI":4, # Neural, Entailment, Contradiction
