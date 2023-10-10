@@ -204,19 +204,34 @@ class Llama2_Lora(Llama2):
 
 class Llama2_GLora(Llama2):
     def __init__(self, model_name, base_path, peft_path, tokenizer_path, config_path="",gpu_id=0) -> None:
-        pass
-        from peft import PeftConfig,PeftModel
+        import torch
+        from peft_utils import set_glora_with_config
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
-        peft_config = PeftConfig.from_pretrained(base_path)
-        self.model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, 
-                                                          trust_remote_code=True)
-        self.model =  PeftModel.from_pretrained(self.model,base_path,).bfloat16().to(gpu_id)
+        self.model = AutoModelForCausalLM.from_pretrained(base_path, trust_remote_code=True).bfloat16().to(gpu_id)
+        load_path="/mnt/SFT_store/xxw/ViT-Slim/GLoRA/models/save/llama/4peft_item1step8000.pt"
+        configs_path="/mnt/SFT_store/xxw/ViT-Slim/GLoRA/models/save/llama_evolution/checkpoint-16.pth.tar"
+        info = torch.load(configs_path)
+        eval_configs =info['keep_top_k'][10][0]
+        set_glora_with_config(model=self.model,lora_rank=4,configs=eval_configs,set_head=True,use_print=True)
+        self._load_glora(load_path,self.model)
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
+    
+    def _load_glora(load_path, model):
+        import torch
+        weights = torch.load(load_path)
+        weights = {k.replace('module.', ''): v for k, v in weights.items()}
+        loaded = 0
+        for n, p in model.named_parameters():
+            if any([x in n for x in ['A', 'B', 'C', 'D', 'E']]) and "head" not in n:
+                p.data = weights[n]
+                loaded +=1
+        print(f'successfully loaded {loaded} trained parameter tensors')
+        return model
             
             
 class Qwen(Llama2):
