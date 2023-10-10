@@ -1,7 +1,7 @@
 MODEL=llama2
 LLAMA_BASE=/data/LLM/Llama-2-7b-hf/
 
-dataset="GAOKAO2023"
+dataset="MMLU"
 current_datetime=$(date +"%m%d_%H_%M_%S")
 {
     CUDA_VISIBLE_DEVICES=3 python main_v2.py --dataset-names="$dataset" \

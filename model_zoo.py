@@ -201,9 +201,125 @@ class Llama2_Lora(Llama2):
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
 
+
+class Llama2_GLora(Llama2):
+    def __init__(self, model_name, base_path, peft_path, tokenizer_path, config_path="",gpu_id=0) -> None:
+        pass
+        from peft import PeftConfig,PeftModel
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
+        peft_config = PeftConfig.from_pretrained(base_path)
+        self.model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, 
+                                                          trust_remote_code=True)
+        self.model =  PeftModel.from_pretrained(self.model,base_path,).bfloat16().to(gpu_id)
+        if "chatglm2" not in self.name:
+            self.tokenizer.pad_token = self.tokenizer.bos_token
+            self.model.config.pad_token_id = self.model.config.bos_token_id
+            
+            
+class Qwen(Llama2):
+    def __init__(self, model_name="", base_path="", peft_path="", tokenizer_path="", config_path="",gpu_id=0) -> None:
+        from transformers.generation import GenerationConfig
+        self.name = model_name
+        cache_path = "/home/xxw/.cache/huggingface/hub/models--Qwen--Qwen-7B/snapshots/c6bf4b5d52d7f81dbd6f046eb7efacc2ce3dae2b"
+        self.tokenizer = AutoTokenizer.from_pretrained(cache_path, trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(cache_path, trust_remote_code=True).bfloat16().to(gpu_id).eval()
+        self.tokenizer.pad_token_id = self.tokenizer.eos_token_id = 151643
+        self.model.generation_config = GenerationConfig.from_pretrained(cache_path, trust_remote_code=True)
+        
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries, padding=False, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        if use_logits:
+            results = []
+            outputs = self.model(inputs.input_ids)# return_last_logit=True)
+            logits = outputs.logits[:, -1]
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
+        else:
+            gen_kwargs = {
+                "max_new_tokens": nt,
+                "num_beams": 1,
+                "do_sample": False,
+                "top_p": 0.9,
+                "temperature": 0.1,
+            } 
+            # 去除token_type_ids
+            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+            
+            outputs = outputs[:,-1*nt:]
+            
+
+            results = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(results) == len(queries)
+            
+        results = [postprocess(result,self.name) for result in results]
+    
+        return results
 # if __name__ == "__main__":
-    # model = Llama2_Lora(model_name="llama2_lora",model_path="/mnt/SFT_store/xxw/outputs/5peft/item0",tokenizer_path="/mnt/SFT_store/xxw/outputs/5peft/item0")
- 
+#     model = Qwen()
+#     pass
+   
+
+class InternLM(Llama2):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
+        super().__init__(model_name, model_path, tokenizer_path, config_path, gpu_id)
+        self.name=model_name
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        if use_logits:
+            results = []
+            outputs = self.model(inputs.input_ids)# return_last_logit=True)
+            logits = outputs.logits[:, -1]
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
+        else:
+            gen_kwargs = {
+                "max_new_tokens": nt,
+                "num_beams": 1,
+                "do_sample": False,
+                "top_p": 0.9,
+                "temperature": 0.1,
+            } 
+            # 去除token_type_ids
+            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+            
+            outputs = outputs[:,-1*nt:]
+            
+
+            results = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(results) == len(queries)
+            
+        results = [postprocess(result,self.name) for result in results]
+    
+        return results
 MODEL_DICT = {
     # "chatglm2-6b": ChatGLM2,
     "chatglm2-6b": Llama2,
@@ -223,4 +339,6 @@ MODEL_DICT = {
     "Michael_v03":Llama2,
     "mac_llm":Llama_colossalai,
     "llama2_lora":Llama2_Lora,
+    "llama2_glora":Llama2_GLora,
+    "Qwen":Qwen,
 }

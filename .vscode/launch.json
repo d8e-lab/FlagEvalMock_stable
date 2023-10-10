@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: model_zoo debug",
+            "type": "python",
+            "request": "launch",
+            "program": "/mnt/SFT_store/3090_eval/FlagEvalMock_stable/model_zoo.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/mnt/SFT_store/xxw/envs/qwen/bin/python",
+        }
+    ]
+}
