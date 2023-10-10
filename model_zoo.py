@@ -204,16 +204,19 @@ class Llama2_Lora(Llama2):
 
 class Llama2_GLora(Llama2):
     def __init__(self, model_name, base_path, peft_path, tokenizer_path, config_path="",gpu_id=0) -> None:
-        pass
         from peft import PeftConfig,PeftModel
+        from peft_utils import set_glora
+        import torch
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
-        peft_config = PeftConfig.from_pretrained(base_path)
-        self.model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, 
-                                                          trust_remote_code=True)
-        self.model =  PeftModel.from_pretrained(self.model,base_path,).bfloat16().to(gpu_id)
+        self.model = AutoModelForCausalLM.from_pretrained(base_path, 
+                                                          trust_remote_code=True).bfloat16().to(gpu_id)
+        set_glora(self.model)
+        config_path = "/mnt/SFT_store/xxw/ViT-Slim/GLoRA/models/save/llama_evolution/checkpoint-11.pth.tar"
+        info = torch.load(config_path)
+        eval_config =info['keep_top_k'][10][0]
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
