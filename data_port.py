@@ -30,7 +30,6 @@ ALL_DATASET = [
     "BoolQ",
     "MMLU",
     "TruthfulQA",
-    "IMDB",
     "RAFT",
     "Chinese_MMLU",
     "C-Eval",
@@ -42,6 +41,7 @@ ALL_DATASET = [
     "TNEWS",
     "OCNLI",
     "BUSTM",
+    "IMDB",
 ]
 ALL_DIRPATH_DIC = {
     "BUSTM": "/mnt/SFT_store/flagevalmock/BUSTM",
