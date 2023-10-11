@@ -68,7 +68,7 @@ class Llama2(BaseLLM):
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
             .bfloat16()
-            .to(gpu_id)
+            .to(gpu_id).eval()
         )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
@@ -344,4 +344,5 @@ MODEL_DICT = {
     "llama2_lora":Llama2_Lora,
     "llama2_glora":Llama2_GLora,
     "Qwen":Qwen,
+    "InternLM":InternLM,
 }
