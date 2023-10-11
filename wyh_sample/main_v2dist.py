@@ -183,8 +183,9 @@ if not args.no_save:
             if saved_name is None or saved_name == "":
                 saved_name = "./evaluation_results/"
             saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+            save_name=args.model_path.split("/")[-1] if len(args.model_path.split("/")[-1]) > 0 else args.model_path.split("/")[-2]
             saved_file = (
-                args.model_name
+                save_name
                 + "_"
                 + saved_time
                 + "_"
