@@ -190,13 +190,13 @@ class Llama2_Lora(Llama2):
         # 为兼容用法 此处model_path实则为peft_path
         from peft import PeftConfig,PeftModel
         self.name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
-        )
         peft_config = PeftConfig.from_pretrained(model_path)
         self.model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, 
                                                           trust_remote_code=True)
         self.model =  PeftModel.from_pretrained(self.model,model_path,).bfloat16().to(gpu_id)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            peft_config.base_model_name_or_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
