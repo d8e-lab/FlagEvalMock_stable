@@ -159,7 +159,8 @@ with torch.no_grad():
         condition = (
             (result_df["Model"] == model_name)
             & (result_df["Use_Logits"] == use_logits)
-            & (result_df["NT"] == nt)
+            & (result_df["NT"] == 1)
+            # & (result_df["NT"] == nt)
         )
         if result_df.loc[condition].empty:
             new_row = [model_name, use_logits, nt] + [None] * 2 * len(ALL_DATASET)
@@ -181,10 +182,12 @@ if not args.no_save:
         else:
             saved_name = args.saver_path
             if saved_name is None or saved_name == "":
+                os.system("mkdir -p ./evaluation_results/")
                 saved_name = "./evaluation_results/"
             saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
             saved_file = (
-                args.model_name
+                # args.model_name
+                args.model_path.split("/")[-1]
                 + "_"
                 + saved_time
                 + "_"
