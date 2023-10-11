@@ -284,8 +284,8 @@ class InternLM(BaseLLM):
         self.name = "InternLM"
         self.history = []
         
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True).cuda(gpu_id).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained("/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained("/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True).cuda(gpu_id).eval()
         
         # Setting padding tokens if required
         self.tokenizer.pad_token = self.tokenizer.bos_token
