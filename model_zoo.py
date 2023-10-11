@@ -75,7 +75,7 @@ class Llama2(BaseLLM):
             self.model.config.pad_token_id = self.model.config.bos_token_id
         pass
 
-    def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name=""):
         choice_tokenss = []
         for choices in choiceses:
             choice_tokens = [
@@ -115,6 +115,33 @@ class Llama2(BaseLLM):
             
         results = [postprocess(result,self.name) for result in results]
     
+        return results
+
+class BaiChuan2(Llama2):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, use_fast=False, trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", trust_remote_code=True).bfloat16()
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries,return_tensors='pt',max_length=2048).to(self.model.device)
+        gen_kwargs = {
+            "max_new_tokens": nt,
+            "repetition_penalty":1.1,
+        }
+        outputs = self.model.generate(**inputs,**gen_kwargs)
+        outputs = outputs[:,-1*nt:]
+        results = self.tokenizer.batch_decode(
+            outputs,
+            skip_special_tokens=True
+        )
         return results
 
 MODEL_CONFIGS = {
@@ -344,4 +371,5 @@ MODEL_DICT = {
     "llama2_lora":Llama2_Lora,
     "llama2_glora":Llama2_GLora,
     "Qwen":Qwen,
+    "BaiChuan2_base":BaiChuan2,
 }
