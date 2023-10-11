@@ -68,7 +68,7 @@ class Llama2(BaseLLM):
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
             .bfloat16()
-            .to(gpu_id)
+            .to(gpu_id).eval()
         )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
@@ -217,13 +217,13 @@ class Llama2_Lora(Llama2):
         # 为兼容用法 此处model_path实则为peft_path
         from peft import PeftConfig,PeftModel
         self.name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
-        )
         peft_config = PeftConfig.from_pretrained(model_path)
         self.model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, 
                                                           trust_remote_code=True)
         self.model =  PeftModel.from_pretrained(self.model,model_path,).bfloat16().to(gpu_id)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            peft_config.base_model_name_or_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
@@ -305,51 +305,27 @@ class Qwen(Llama2):
 #     pass
    
 
-class InternLM(Llama2):
+class InternLM(BaseLLM):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
-        super().__init__(model_name, model_path, tokenizer_path, config_path, gpu_id)
-        self.name=model_name
-    def inference(self, queries, choiceses, use_logits, nt, dataset_name):
-        choice_tokenss = []
-        for choices in choiceses:
-            choice_tokens = [
-                self.tokenizer.encode(choice, add_special_tokens=False)[0]
-                for choice in choices
-            ]
-            choice_tokenss.append(choice_tokens)
-        queries = [preprocess(q) for q in queries]
-        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
-        if use_logits:
-            results = []
-            outputs = self.model(inputs.input_ids)# return_last_logit=True)
-            logits = outputs.logits[:, -1]
-            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
-                logit = logits[i, choice_tokens] # 选取对应choice index的logit
-                p = logit.argmax(dim=-1)
-                results.append(choices[p])
-        else:
-            gen_kwargs = {
-                "max_new_tokens": nt,
-                "num_beams": 1,
-                "do_sample": False,
-                "top_p": 0.9,
-                "temperature": 0.1,
-            } 
-            # 去除token_type_ids
-            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
-            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
-            
-            outputs = outputs[:,-1*nt:]
-            
+        super().__init__()
+        self.name = "InternLM"
+        self.history = []
+        
+        self.tokenizer = AutoTokenizer.from_pretrained("/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained("/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True).cuda(gpu_id).eval()
+        
+        # Setting padding tokens if required
+        self.tokenizer.pad_token = self.tokenizer.bos_token
+        self.model.config.pad_token_id = self.model.config.bos_token_id
 
-            results = self.tokenizer.batch_decode(
-                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-            assert len(results) == len(queries)
-            
+    def inference(self, queries, use_logits=False, nt=50, dataset_name=None):
+        responses = []
+        for query in queries:
+            response,_ = self.model.chat(self.tokenizer, query, history=self.history)
+            responses.append(response)
         results = [postprocess(result,self.name) for result in results]
-    
         return results
+
 MODEL_DICT = {
     # "chatglm2-6b": ChatGLM2,
     "chatglm2-6b": Llama2,
@@ -371,5 +347,9 @@ MODEL_DICT = {
     "llama2_lora":Llama2_Lora,
     "llama2_glora":Llama2_GLora,
     "Qwen":Qwen,
+<<<<<<< HEAD
     "BaiChuan2_base":BaiChuan2,
+=======
+    "InternLM":InternLM,
+>>>>>>> wyh
 }
