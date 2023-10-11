@@ -347,9 +347,6 @@ MODEL_DICT = {
     "llama2_lora":Llama2_Lora,
     "llama2_glora":Llama2_GLora,
     "Qwen":Qwen,
-<<<<<<< HEAD
     "BaiChuan2_base":BaiChuan2,
-=======
     "InternLM":InternLM,
->>>>>>> wyh
 }
