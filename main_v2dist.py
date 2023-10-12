@@ -185,9 +185,10 @@ if not args.no_save:
                 os.system("mkdir -p ./evaluation_results/")
                 saved_name = "./evaluation_results/"
             saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+            filename_prefix=args.model_path.split("/")[-1] if len(args.model_path.split("/")[-1]) > 0 else args.model_path.split("/")[-2]
             saved_file = (
                 # args.model_name
-                args.model_path.split("/")[-1]
+                filename_prefix
                 + "_"
                 + saved_time
                 + "_"
