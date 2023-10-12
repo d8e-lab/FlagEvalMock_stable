@@ -1,4 +1,4 @@
-MODEL=InternLM
+MODEL=llama2
 # tokenizer=/mnt/store/internlm-20b/
 LLAMA_BASE=/mnt/store/internlm-20b/
 current_datetime=$(date +"%m%d_%H_%M_%S")
