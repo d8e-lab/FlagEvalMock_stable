@@ -312,8 +312,8 @@ class InternLM(BaseLLM):
         self.name = "InternLM"
         # self.history = []
         
-        self.tokenizer = AutoTokenizer.from_pretrained("internlm/internlm-chat-7b",cache_dir= "/mnt/SFT_store/LLM/InternLM-hf/",padding_side='left',truncation_side="left" , trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained("internlm/internlm-chat-7b",cache_dir= "/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True).bfloat16().cuda(gpu_id).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,padding_side='left',truncation_side="left" , trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).bfloat16().cuda(gpu_id).eval()
         
         # Setting padding tokens if required
         self.tokenizer.pad_token = self.tokenizer.bos_token
