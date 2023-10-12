@@ -849,11 +849,7 @@ class MMLUDataset(Dataset):
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         # dataset = load_dataset("tasksource/mmlu")
         # dataset_path = "tasksource/mmlu"
-<<<<<<< HEAD
         dataset_path = "/mnt/SFT_store/flagevalmock/mmlu"
-=======
-        dataset_path = "/mnt/SFT_store/flagevalmock/mmlu/"
->>>>>>> wyh
         courses = [
             "abstract_algebra",
             "anatomy",
