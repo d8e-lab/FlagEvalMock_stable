@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel, LlamaTokenizerFast
 # from transformers import LlamaForCausalLM, LlamaTokenizerFast
@@ -389,25 +389,63 @@ class Qwen(Llama2):
 #     model = Qwen()
 #     pass
    
-
 class InternLM(BaseLLM):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
         super().__init__()
         self.name = "InternLM"
-        self.history = []
+        # self.history = []
         
-        self.tokenizer = AutoTokenizer.from_pretrained("/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained("/mnt/SFT_store/LLM/InternLM-hf/", trust_remote_code=True).cuda(gpu_id).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,padding_side='left',truncation_side="left" , trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).bfloat16().cuda(gpu_id).eval()
         
         # Setting padding tokens if required
         self.tokenizer.pad_token = self.tokenizer.bos_token
         self.model.config.pad_token_id = self.model.config.bos_token_id
+        self.device=self.model.device
+        # self.starter="""<|User|>:"""
+        # {'input_ids': tensor([[    1,   333,   352,  1621,   352, 27232]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1]])}
+        self.start_token=self.tokenizer(["""<|User|>:"""], return_tensors="pt")
+        # print(self.start_token)
+        # exit()
 
-    def inference(self, queries, use_logits=False, nt=50, dataset_name=None):
-        responses = []
+    def build_inputs(self, tokenizer, query: str, history: List[Tuple[str, str]] = [],max_length:int=4096):
+        prompt = ""
+        for record in history:
+            prompt += f"""<|User|>:{record[0]}<eoh>\n<|Bot|>:{record[1]}<eoa>\n"""
+        prompt += f"""<|User|>:{query}<eoh>\n<|Bot|>:"""
+        return tokenizer([prompt], return_tensors="pt", truncation=True, padding=False, max_length=max_length)
+    
+    @torch.no_grad()
+    def inference(self, queries,choiceses=None, use_logits=False, nt=50, dataset_name=None):
+        results = []
+        gen_kwargs = {
+            "max_new_tokens": nt,
+            "num_beams": 1,
+            "do_sample": False,
+            "top_p": 0.9,
+            "temperature": 0.1,
+        }    
+        queries = [preprocess(q) for q in queries]
         for query in queries:
-            response,_ = self.model.chat(self.tokenizer, query, history=self.history)
-            responses.append(response)
+            # response,_ = self.model.chat(self.tokenizer, query, history=[],max_new_tokens=64,do_sample=False)
+            # inputs = self.build_inputs(self.tokenizer, query, [],max_length=3072)
+            prompt = f"""<|User|>:{query}<eoh>\n<|Bot|>:"""
+            inputs =  self.tokenizer([prompt], return_tensors="pt", truncation=True, padding=False, max_length=2048)
+            # if not all([q_ids==s_ids for q_ids,s_ids in zip(inputs["input_ids"][:self.start_token["input_ids"].shape[0]],self.start_token["input_ids"])]):
+            if not torch.equal(inputs["input_ids"][:, :self.start_token["input_ids"].shape[1]], self.start_token["input_ids"]):
+                inputs["input_ids"] = torch.cat((self.start_token["input_ids"], inputs["input_ids"]), dim=1)
+                inputs["attention_mask"]=torch.cat((self.start_token["attention_mask"], inputs["attention_mask"]), dim=1)
+            inputs = {k: v.to(self.device) for k, v in inputs.items() if torch.is_tensor(v)}
+            # inputs["input_ids"]=inputs["input_ids"].bfloat16()
+            outputs = self.model.generate(**inputs, **gen_kwargs)
+            # outputs = outputs[0].cpu().tolist()[-1*nt:]
+            outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]):]
+            response = self.tokenizer.decode(outputs, skip_special_tokens=True)
+            response = response.split("<eoa>")[0]
+            # history = history + [(query, response)]
+            # return response, history
+            results.append(response)
+        # print(results)
         results = [postprocess(result,self.name) for result in results]
         return results
 
