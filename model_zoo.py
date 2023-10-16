@@ -1,7 +1,11 @@
+from typing import List
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel, LlamaTokenizerFast
 # from transformers import LlamaForCausalLM, LlamaTokenizerFast
 from transformers import LlamaForCausalLM, LlamaTokenizer
 from transformers.models.llama.configuration_llama import LlamaConfig
+from transformers.generation.utils import GenerationConfig
+
 import re
 
 # def preprocess(query):
@@ -29,6 +33,7 @@ def postprocess(result,model_name:str=""):
     result=result.strip("答案")
     result = re.sub(r"^[\s\n\t:：\ufff0-\uffff]+", "", result)
     result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
+    result = re.sub(r'</s>', '', result)
     return result
 def postprocess_(result,model_name:str=""):
     # result = result.split("\n")[0]
@@ -120,29 +125,73 @@ class Llama2(BaseLLM):
 class BaiChuan2(Llama2):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
         self.name = model_name
+        # self.generation_config=GenerationConfig.from_pretrained("baichuan-inc/Baichuan2-7B-Chat")
+        # print(type(self.generation_config),self.generation_config)
+        # exit()
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, use_fast=False, trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", trust_remote_code=True).bfloat16()
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).bfloat16().to(gpu_id).eval()
+        # self.model.generation_config = self.generation_config
+        self.device=self.model.device
+
     def inference(self, queries, choiceses, use_logits, nt, dataset_name):
-        choice_tokenss = []
-        for choices in choiceses:
-            choice_tokens = [
-                self.tokenizer.encode(choice, add_special_tokens=False)[0]
-                for choice in choices
-            ]
-            choice_tokenss.append(choice_tokens)
-        queries = [preprocess(q) for q in queries]
-        inputs = self.tokenizer(queries,return_tensors='pt',max_length=2048).to(self.model.device)
-        gen_kwargs = {
-            "max_new_tokens": nt,
-            "repetition_penalty":1.1,
-        }
-        outputs = self.model.generate(**inputs,**gen_kwargs)
-        outputs = outputs[:,-1*nt:]
-        results = self.tokenizer.batch_decode(
-            outputs,
-            skip_special_tokens=True
+        max_length=2048
+        generation_config = GenerationConfig(
+            **{
+                "pad_token_id": 0,
+                "bos_token_id": 1,
+                "eos_token_id": 2,
+                "user_token_id": 195,
+                "assistant_token_id": 196,
+                "max_new_tokens": nt,
+                "temperature": 0.3,
+                "top_k": 5,
+                "top_p": 0.85,
+                "repetition_penalty": 1.05,
+                "do_sample": False,
+                "transformers_version": "4.29.2"
+            }
         )
-        return results
+        responses=[]
+        for query in queries:
+            query=preprocess(query)
+            # messages = []
+            # messages.append({"role": "user", "content": query})
+            # response = self.model.chat(self.tokenizer, messages)
+
+            # input_ids = self.build_chat_input(self, self.tokenizer, messages, generation_config.max_new_tokens)
+            
+            input_ids=[generation_config.user_token_id]
+            input_ids+= self.tokenizer.encode(query)
+            input_ids+=[generation_config.assistant_token_id]
+            if(len(input_ids)>=max_length): 
+                input_ids=[generation_config.user_token_id]+input_ids[-max_length:]
+            input_ids = torch.LongTensor([input_ids]).to(self.device)
+            outputs = self.model.generate(input_ids, generation_config=generation_config)
+            response = self.tokenizer.decode(outputs[0][len(input_ids[0]):], skip_special_tokens=True)
+
+            responses.append(postprocess(response))
+        return responses
+    # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+    #     choice_tokenss = []
+    #     for choices in choiceses:
+    #         choice_tokens = [
+    #             self.tokenizer.encode(choice, add_special_tokens=False)[0]
+    #             for choice in choices
+    #         ]
+    #         choice_tokenss.append(choice_tokens)
+    #     queries = [preprocess(q) for q in queries]
+    #     inputs = self.tokenizer(queries,return_tensors='pt',max_length=2048).to(self.model.device)
+    #     gen_kwargs = {
+    #         "max_new_tokens": nt,
+    #         "repetition_penalty":1.1,
+    #     }
+    #     outputs = self.model.generate(**inputs,**gen_kwargs)
+    #     outputs = outputs[:,-1*nt:]
+    #     results = self.tokenizer.batch_decode(
+    #         outputs,
+    #         skip_special_tokens=True
+    #     )
+    #     return results
 
 MODEL_CONFIGS = {
     '7b': LlamaConfig(num_hidden_layers=32+4, vocab_size=49953),
@@ -230,76 +279,112 @@ class Llama2_Lora(Llama2):
 
 
 class Llama2_GLora(Llama2):
-    def __init__(self, model_name, base_path, peft_path, tokenizer_path, config_path="",gpu_id=0) -> None:
+    def __init__(self, model_name, base_path,  tokenizer_path, config_path="",gpu_id=0) -> None:
         from peft import PeftConfig,PeftModel
-        from peft_utils import set_glora
+        from peft_utils import set_glora,load_glora
         import torch
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+            base_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
         self.model = AutoModelForCausalLM.from_pretrained(base_path, 
-                                                          trust_remote_code=True).bfloat16().to(gpu_id)
-        set_glora(self.model)
-        config_path = "/mnt/SFT_store/xxw/ViT-Slim/GLoRA/models/save/llama_evolution/checkpoint-11.pth.tar"
-        info = torch.load(config_path)
-        eval_config =info['keep_top_k'][10][0]
+                                                          trust_remote_code=True)
+        load_path="/mnt/SFT_store/flageval_peft/outputs/glora/2023-10-15_06-15-55_success/final.pt"
+        set_glora(self.model,4)
+        load_glora(load_path,self.model)
+        self.model = self.model.bfloat16().to(gpu_id).eval()
+        # config_path = "/mnt/SFT_store/xxw/ViT-Slim/GLoRA/models/save/llama_evolution/checkpoint-11.pth.tar"
+        # info = torch.load(config_path)
+        # eval_config =info['keep_top_k'][10][0]
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
-            
+
+class Llama2_repadapter(Llama2):
+    def __init__(self, model_name, base_path, tokenizer_path, config_path="",gpu_id=0) -> None:
+        from peft import PeftConfig,PeftModel
+        from peft_utils import set_repadapter,load_repadapter
+        import torch
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            base_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
+        self.model = AutoModelForCausalLM.from_pretrained(base_path, 
+                                                          trust_remote_code=True).bfloat16()
+        load_path = "/mnt/SFT_store/flageval_peft/outputs/repadapter/2023-10-12_06-48-13_success/final.pt"
+        set_repadapter(self.model)
+        load_repadapter(load_path,self.model)
+        self.model = self.model.bfloat16().to(gpu_id)
+        if "chatglm2" not in self.name:
+            self.tokenizer.pad_token = self.tokenizer.bos_token
+            self.model.config.pad_token_id = self.model.config.bos_token_id 
             
 class Qwen(Llama2):
     def __init__(self, model_name="", base_path="", peft_path="", tokenizer_path="", config_path="",gpu_id=0) -> None:
         from transformers.generation import GenerationConfig
         self.name = model_name
-        cache_path = "/home/xxw/.cache/huggingface/hub/models--Qwen--Qwen-7B/snapshots/c6bf4b5d52d7f81dbd6f046eb7efacc2ce3dae2b"
+        # cache_path = "/home/xxw/.cache/huggingface/hub/models--Qwen--Qwen-7B/snapshots/c6bf4b5d52d7f81dbd6f046eb7efacc2ce3dae2b"
+        cache_path = "/data/LLM/c6bf4b5d52d7f81dbd6f046eb7efacc2ce3dae2b/"
+        cache_path = "/mnt/SFT_store/LLM/Qwen-7B/"
         self.tokenizer = AutoTokenizer.from_pretrained(cache_path, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(cache_path, trust_remote_code=True).bfloat16().to(gpu_id).eval()
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id = 151643
         self.model.generation_config = GenerationConfig.from_pretrained(cache_path, trust_remote_code=True)
-        
     def inference(self, queries, choiceses, use_logits, nt, dataset_name):
-        choice_tokenss = []
-        for choices in choiceses:
-            choice_tokens = [
-                self.tokenizer.encode(choice, add_special_tokens=False)[0]
-                for choice in choices
-            ]
-            choice_tokenss.append(choice_tokens)
-        queries = [preprocess(q) for q in queries]
-        inputs = self.tokenizer(queries, padding=False, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
-        if use_logits:
-            results = []
-            outputs = self.model(inputs.input_ids)# return_last_logit=True)
-            logits = outputs.logits[:, -1]
-            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
-                logit = logits[i, choice_tokens] # 选取对应choice index的logit
-                p = logit.argmax(dim=-1)
-                results.append(choices[p])
-        else:
-            gen_kwargs = {
-                "max_new_tokens": nt,
-                "num_beams": 1,
-                "do_sample": False,
-                "top_p": 0.9,
-                "temperature": 0.1,
-            } 
-            # 去除token_type_ids
-            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
-            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+        responses=[]
+        for query in queries:
+            query=preprocess(query)
+            inputs = self.tokenizer(query,padding=False, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+            # print(inputs)
+            response = self.model.generate(**inputs)
+            response = response.cpu()[0][:, len(inputs["input_ids"]):]
+            response=self.tokenizer.decode(response, skip_special_tokens=True)
+            responses.append(postprocess(response))
+        return responses
+            # print(response)
+            # exit()
+    # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+    #     choice_tokenss = []
+    #     for choices in choiceses:
+    #         choice_tokens = [
+    #             self.tokenizer.encode(choice, add_special_tokens=False)[0]
+    #             for choice in choices
+    #         ]
+    #         choice_tokenss.append(choice_tokens)
+    #     queries = [preprocess(q) for q in queries]
+    #     inputs = self.tokenizer(queries, padding=False, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+    #     if use_logits:
+    #         results = []
+    #         outputs = self.model(inputs.input_ids)# return_last_logit=True)
+    #         logits = outputs.logits[:, -1]
+    #         for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+    #             logit = logits[i, choice_tokens] # 选取对应choice index的logit
+    #             p = logit.argmax(dim=-1)
+    #             results.append(choices[p])
+    #     else:
+    #         gen_kwargs = {
+    #             "max_new_tokens": nt,
+    #             "num_beams": 1,
+    #             "do_sample": False,
+    #             "top_p": 0.9,
+    #             "temperature": 0.1,
+    #         } 
+    #         # 去除token_type_ids
+    #         # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+    #         outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
             
-            outputs = outputs[:,-1*nt:]
+    #         outputs = outputs[:,-1*nt:]
             
 
-            results = self.tokenizer.batch_decode(
-                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-            assert len(results) == len(queries)
+    #         results = self.tokenizer.batch_decode(
+    #             outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    #         )
+    #         assert len(results) == len(queries)
             
-        results = [postprocess(result,self.name) for result in results]
+    #     results = [postprocess(result,self.name) for result in results]
     
-        return results
+    #     return results
+
 # if __name__ == "__main__":
 #     model = Qwen()
 #     pass
@@ -326,6 +411,99 @@ class InternLM(BaseLLM):
         results = [postprocess(result,self.name) for result in results]
         return results
 
+class AquilaChat(BaseLLM):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
+        super().__init__()
+        self.name=model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).bfloat16().to(gpu_id).eval()
+        self.device = self.model.device
+    @torch.no_grad()
+    def inference(self, queries, choiceses, use_logits=False, nt=50, dataset_name=None):
+        max_length=2048
+        results = []
+        generation_config= GenerationConfig(
+            **{
+                "_from_model_config": True,
+                "bos_token_id": 1,
+                "eos_token_id": 2,
+                "pad_token_id": 0,
+                # "transformers_version": "4.28.1",
+                "max_new_tokens": nt,
+            }
+        )
+        for query in queries:
+            # print(type(query),query)
+            tokens = self.tokenizer.encode_plus(text=query,
+                                                max_length=max_length,
+                                                truncation="longest_first",
+                                                )['input_ids'][:-1]
+            tokens = torch.tensor(tokens)[None,].to(self.device)
+
+            stop_tokens = ["###", "[UNK]", "</s>"]
+            out = self.model.generate(tokens, do_sample=False, eos_token_id=100007, 
+                                 bad_words_ids=[[self.tokenizer.encode(token)[0] for token in stop_tokens]],
+                                 generation_config=generation_config)[0]
+            # print("TOKEN length ",len(out)," - ",tokens.shape)
+            out=out[tokens.shape[1]:]
+            out = self.tokenizer.decode(out.cpu().numpy().tolist())
+            results.append(out)
+        results = [postprocess(result,self.name) for result in results]
+        return results
+    # @torch.no_grad()
+    # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
+    #     max_length=2048
+    #     generation_config= GenerationConfig(
+    #         **{
+    #             "_from_model_config": True,
+    #             "bos_token_id": 1,
+    #             "eos_token_id": 2,
+    #             "pad_token_id": 0,
+    #             # "transformers_version": "4.28.1",
+    #             "max_new_tokens": nt,
+    #         }
+    #     )
+    #     results=[]
+    #     for query in queries:
+    #         query=preprocess(query)
+    #         # messages = []
+    #         # messages.append({"role": "user", "content": query})
+    #         # response = self.model.chat(self.tokenizer, messages)
+
+    #         # input_ids = self.build_chat_input(self, self.tokenizer, messages, generation_config.max_new_tokens)
+            
+    #         input_ids=[generation_config.bos_token_id]
+    #         input_ids+= self.tokenizer.encode(query)
+    #         if(len(input_ids)>=max_length): 
+    #             input_ids=[generation_config.bos_token_id]+input_ids[-max_length:]
+    #         input_ids = torch.LongTensor([input_ids]).to(self.device)
+    #         # outputs = self.model.generate(input_ids, generation_config=generation_config)
+    #         # response = self.tokenizer.decode(outputs[0][len(input_ids[0]):], skip_special_tokens=True)
+
+    #         # responses.append(postprocess(response))
+
+    #         stop_tokens = ["###", "[UNK]", "</s>"]
+    #         out = self.model.generate(input_ids, do_sample=False, eos_token_id=100007, 
+    #                              bad_words_ids=[[self.tokenizer.encode(token)[0] for token in stop_tokens]],
+    #                              generation_config=generation_config)[0]
+    #         out = self.tokenizer.decode(out.cpu().numpy().tolist())
+    #         results.append(out)
+    #     results = [postprocess(result,self.name) for result in results]
+    #     return results
+class YulanChat(Llama2):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
+        # print('model_name:',model_name)
+        self.model = (
+            AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
+            .bfloat16()
+            .to(gpu_id).eval()
+        )    # def inference(self, queries, choiceses, use_logits=False, nt=50, dataset_name=None):
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+    #     return [""]*len(queries)
 MODEL_DICT = {
     # "chatglm2-6b": ChatGLM2,
     "chatglm2-6b": Llama2,
@@ -349,4 +527,7 @@ MODEL_DICT = {
     "Qwen":Qwen,
     "BaiChuan2_base":BaiChuan2,
     "InternLM":InternLM,
+    "AquilaChat":AquilaChat,
+    "YulanChat":YulanChat,
+    "Llama2_repadapter":Llama2_repadapter,
 }
