@@ -122,6 +122,7 @@ with torch.no_grad():
         start = time.time()
         outputs = []
         truth=[]
+        # before_post=[]
         choiceses=[]
         for batch in tqdm(dataloader):
             queries = batch["prompt"]
@@ -132,16 +133,20 @@ with torch.no_grad():
                     choiceses = candidate
             else:
                 choiceses= [ choices for _ in queries]
+            # results,bf = llm.inference(queries, choiceses, use_logits, nt, dataset_names)
             results = llm.inference(queries, choiceses, use_logits, nt, dataset_names)
             outputs.extend(results)
             truth.extend(answers)
+            # before_post.extend(bf)
             if len(outputs) > 20:
                 if args.verbose:
                     print_rank0(len(results), len(answers))
+                    # print_rank0("before: ", before_post)
                     print_rank0("output: ", outputs)
                     print_rank0("truth : ", truth)
                 outputs = []
                 truth=[]
+                before_post=[]
             correct += sum([1 if a.strip().strip(".") == i.strip() else 0 for (i, a) in zip(results, answers)])
         # exit()
         time_cost = time.time() - start

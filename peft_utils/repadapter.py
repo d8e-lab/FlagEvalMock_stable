@@ -8,7 +8,7 @@ class RepadpterLinear(torch.nn.Linear):
         self.adapter = RepAdapter(in_features=in_features)
     
     def forward(self, input):
-        input = self.adapter(input)
+        input = self.adapter(input) + input
         return F.linear(input, self.weight, self.bias)
 
     @staticmethod
@@ -43,14 +43,14 @@ class RepAdapter(nn.Module):
             scale=1
     ):
         super().__init__()
-        self.conv_A=nn.Conv1d(in_features,hidden_dim,1,groups=1,bias=True)
+        self.conv_A = nn.Conv1d(in_features,hidden_dim,1,groups=1,bias=True)
         self.conv_B = nn.Conv1d(hidden_dim, in_features, 1, groups=groups, bias=True)
 
-        self.dropout=nn.Dropout(0.1)
+        self.dropout=nn.Dropout(0.01)
         self.groups=groups
         self.scale=scale
 
-        nn.init.xavier_uniform_( self.conv_A.weight)
+        nn.init.xavier_uniform_(self.conv_A.weight)
         nn.init.zeros_(self.conv_A.bias)
         nn.init.zeros_(self.conv_B.weight)
         nn.init.zeros_(self.conv_B.bias)

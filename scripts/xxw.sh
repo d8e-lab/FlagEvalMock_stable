@@ -1,3 +1,4 @@
+# MODEL=llama2_repadapter
 MODEL=llama2_glora
 LLAMA_BASE=/mnt/SFT_store/Linksoul-llama2-7b
 # LLAMA_BASE=/mnt/SFT_store/flageval_peft/outputs/lora/2023-10-14_17-11-51_success

@@ -6,9 +6,9 @@ import random
 class SuperScalableLinear(torch.nn.Linear):
     def __init__(self, in_features, out_features, rank):
         super(SuperScalableLinear, self).__init__(in_features=in_features, out_features=out_features)
-        config_A_B = [f'LoRA_{rank}', 'vector', 'constant']
-        config_C = [f'LoRA_{rank}', 'vector',]
-        config_D_E = ['constant', 'vector']
+        config_A_B = [f'LoRA_{rank}', 'vector', 'constant',"none"]
+        config_C = [f'LoRA_{rank}', 'vector',"none"]
+        config_D_E = ['constant', 'vector',"none"]
         self.configs = []
         for A in config_A_B:
             for B in config_A_B:
@@ -17,7 +17,7 @@ class SuperScalableLinear(torch.nn.Linear):
                         for E in config_D_E:
                             config = {'A':A,'B':B,'C':C,'D':D,'E':E}
                             self.configs.append(config)
-
+        self.path_config = random.choice(self.configs)
         self.Ad, self.Au = self.make_param((out_features, in_features), f'LoRA_{rank}')
         self.Bd, self.Bu = self.make_param((out_features, in_features), f'LoRA_{rank}')
         self.Cd, self.Cu = self.make_param((in_features, 1), f'LoRA_{rank}')
@@ -71,14 +71,14 @@ class SuperScalableLinear(torch.nn.Linear):
         
     def forward(self, input):
         if self.eval_config is not None:
-            path_config = self.eval_config
+            self.path_config = self.eval_config
         else:
-            path_config = random.choice(self.configs)
-        A = self.prepare_path(path_config['A'], self.Ad, self.Au)
-        B = self.prepare_path(path_config['B'], self.Bd, self.Bu)
-        C = self.prepare_path(path_config['C'], self.Cd, self.Cu)
-        D = self.prepare_path(path_config['D'], self.D)
-        E = self.prepare_path(path_config['E'], self.E)
+            self.path_config = random.choice(self.configs)
+        A = self.prepare_path(self.path_config['A'], self.Ad, self.Au)
+        B = self.prepare_path(self.path_config['B'], self.Bd, self.Bu)
+        C = self.prepare_path(self.path_config['C'], self.Cd, self.Cu)
+        D = self.prepare_path(self.path_config['D'], self.D)
+        E = self.prepare_path(self.path_config['E'], self.E)
         optimal_weight = self.weight + self.weight*A + B
         if torch.is_tensor(self.bias):
             optimal_bias = self.bias + self.bias*D + E
@@ -139,3 +139,20 @@ def load_glora(load_path, model):
             loaded +=1
     print(f'successfully loaded {loaded} trained parameter tensors')
     return model
+
+def set_glora_eval_config(eval_config, model):
+    i=0
+    for name, l in model.named_modules():
+        if isinstance(l, torch.nn.Linear):
+            tokens = name.strip().split('.')
+            layer = model
+            for t in tokens[:-1]:
+                if not t.isnumeric():
+                    layer = getattr(layer, t)
+                else:
+                    layer = layer[int(t)]
+            glora_layer = getattr(layer, tokens[-1])
+            if hasattr(glora_layer,"eval_config"):
+                glora_layer.eval_config = eval_config[i]
+                print(f'layer_name:{name},eval_config:{glora_layer.eval_config}')
+                i = i+1
