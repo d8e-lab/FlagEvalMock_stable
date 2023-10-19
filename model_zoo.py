@@ -234,24 +234,40 @@ class Llama2_GLora(Llama2):
 #     a=Llama2_GLora("name","/mnt/SFT_store/Linksoul-llama2-7b","/mnt/SFT_store/Linksoul-llama2-7b")
 
 class Llama2_repadapter(Llama2):
-    def __init__(self, model_name, base_path, tokenizer_path, config_path="",gpu_id=0) -> None:
-        from peft import PeftConfig,PeftModel
+    def __init__(self, model_name, base_path, repadapter_path, config_path="",gpu_id=0) -> None:
         from peft_utils import set_repadapter,load_repadapter
-        import torch
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
             base_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
         self.model = AutoModelForCausalLM.from_pretrained(base_path, 
                                                           trust_remote_code=True).bfloat16()
-        load_path = "/mnt/SFT_store/flageval_peft/outputs/repadapter/2023-10-16_07-31-11_success/final.pt"
+        load_path = repadapter_path
         set_repadapter(self.model)
         load_repadapter(load_path,self.model)
         self.model = self.model.bfloat16().to(gpu_id)
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id 
-            
+
+class Llama2_ssf(Llama2):
+    def __init__(self, model_name, base_path, load_path, config_path="",gpu_id=0) -> None:
+        from peft_utils import set_ssf,load_ssf
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            base_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
+        self.model = AutoModelForCausalLM.from_pretrained(base_path, 
+                                                          trust_remote_code=True).bfloat16()
+        load_path = load_path
+        set_ssf(self.model)
+        load_ssf(load_path,self.model)
+        self.model = self.model.bfloat16().to(gpu_id)
+        if "chatglm2" not in self.name:
+            self.tokenizer.pad_token = self.tokenizer.bos_token
+            self.model.config.pad_token_id = self.model.config.bos_token_id 
+
+
 class Qwen(Llama2):
     def __init__(self, model_name="", base_path="", peft_path="", tokenizer_path="", config_path="",gpu_id=0) -> None:
         from transformers.generation import GenerationConfig
@@ -440,7 +456,7 @@ class BaiChuan2Chat(Llama2):
             outputs = self.model.generate(input_ids, generation_config=generation_config)
             response = self.tokenizer.decode(outputs[0][len(input_ids[0]):], skip_special_tokens=True)
 
-            responses.append(postprocess(response))
+            responses.append(postprocess(response)) # 'Positive', 'Negative']
         return responses
     # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
     #     choice_tokenss = []
@@ -504,7 +520,7 @@ class InternLM(BaseLLM):
             "temperature": 0.1,
         }    
         before_post=[]
-        # queries = [preprocess(q) for q in queries]
+        queries = [preprocess(q) for q in queries]
         for query in queries:
             # response,_ = self.model.chat(self.tokenizer, query, history=[],max_new_tokens=64,do_sample=False)
             # inputs = self.build_inputs(self.tokenizer, query, [],max_length=3072)
@@ -538,7 +554,8 @@ class InternLM(BaseLLM):
             results.append(response)
         # print(results)
         results = [postprocess(result,self.name) for result in results]
-        return results,before_post
+        # return results,before_post
+        return results
 
 class AquilaChat(BaseLLM):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
@@ -661,4 +678,5 @@ MODEL_DICT = {
     "AquilaChat":AquilaChat,
     "YulanChat":YulanChat,
     "llama2_repadapter":Llama2_repadapter,
+    "llama2_ssf":Llama2_ssf,
 }
