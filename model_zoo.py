@@ -513,7 +513,7 @@ class InternLM(BaseLLM):
     def inference(self, queries,choiceses=None, use_logits=False, nt=50, dataset_name=None):
         results = []
         gen_kwargs = {
-            "max_new_tokens": 16,
+            "max_new_tokens": nt,
             "num_beams": 1,
             "do_sample": False,
             "top_p": 0.9,
