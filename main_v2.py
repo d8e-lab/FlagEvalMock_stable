@@ -172,6 +172,12 @@ if not args.no_save:
             + "-".join(args.dataset_names.split(","))
             + "_results.csv"
         )
+
+
         saved_name = os.path.join(saved_name, saved_file)
+         # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(saved_name),exist_ok=True)
+
         result_df.to_csv(saved_name, index=False)
+        
 print("Evaluation Total Time Cost:", time.time() - all_start)
