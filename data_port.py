@@ -86,13 +86,13 @@ ALL_NEW_TOKENS = {
     "Chinese_MMLU":1,
     "C-Eval":1,
     "GAOKAO2023":1,
-    "CSL":4, # 1, # 形式很奇怪，看看咋回事
+    "CSL":1, # 1, # 形式很奇怪，看看咋回事
     "ChID":1,
     "CLUEWSC":1, # 1, # 形式很奇怪，看看咋回事
-    "EPRSTMT":4,
-    "TNEWS":4,
-    "OCNLI":4, # Neural, Entailment, Contradiction
-    "BUSTM":4,
+    "EPRSTMT":1,
+    "TNEWS":1,
+    "OCNLI":1, # Neural, Entailment, Contradiction
+    "BUSTM":1,
 
 }
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
