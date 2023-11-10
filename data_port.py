@@ -111,6 +111,8 @@ def get_dataset(dataset_name: str = ""):
             dataset = BoolQDataset()
         elif dataset_name == "MMLU":
             dataset = MMLUDataset()
+        elif dataset_name == "Chinese_MMLU":
+            dataset = CMMLUDataset()
     elif dataset_name in ALL_DIRPATH_DIC:
         datasets = []
         valjson = ALL_DIRPATH_DIC[dataset_name]
@@ -146,8 +148,8 @@ def get_dataset(dataset_name: str = ""):
                         # dataset = LinkSoulCEvalDataset(valjson)
                     elif dataset_name == "GAOKAO2023":
                         dataset = GAOKAO2023Dataset(valjson)
-                    elif dataset_name == "Chinese_MMLU":
-                        dataset = CMMLUDataset(valjson)
+                    # elif dataset_name == "Chinese_MMLU":
+                    #     dataset = CMMLUDataset(valjson)
                     if len(dataset) == 0:
                         continue
                 except Exception as e:
