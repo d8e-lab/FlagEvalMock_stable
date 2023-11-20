@@ -71,7 +71,7 @@ class Llama2(BaseLLM):
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
-        # print('model_name:',model_name)
+        print('gpu_id:',gpu_id)
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
             .bfloat16()
@@ -92,6 +92,7 @@ class Llama2(BaseLLM):
             choice_tokenss.append(choice_tokens)
         queries = [preprocess(q) for q in queries]
         inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        # print(inputs)
         if use_logits:
             results = []
             outputs = self.model(inputs.input_ids)# return_last_logit=True)
@@ -111,16 +112,16 @@ class Llama2(BaseLLM):
             # 去除token_type_ids
             inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
             outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
-            
-            outputs = outputs[:,-1*nt:]
-            
+            # print(len(inputs["input_ids"][0]),len(inputs["input_ids"][0]))
+            # outputs = outputs[:,-1*nt:]
+            outputs = outputs[:,len(inputs["input_ids"][0]):]
 
             results = self.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
-            assert len(results) == len(queries)
+            # assert len(results) == len(queries)
             
-        results = [postprocess(result,self.name) for result in results]
+        # results = [postprocess(result,self.name) for result in results]
     
         return results
 
