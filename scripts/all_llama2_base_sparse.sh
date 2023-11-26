@@ -6,7 +6,7 @@ LOG_PATH="./logs/sparse/${MODEL}/$(basename ${LLAMA_BASE})"
 
 mkdir -p ${LOG_PATH}
 current_datetime=$(date +"%m%d_%H_%M_%S")
-CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --nproc-per-node 4 main_v2dist.py --dataset-names="BoolQ" \
+CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --nproc-per-node 4 main_v2dist.py --dataset-names="IMDB" \
     --model-name $MODEL \
     --model-path $LLAMA_BASE \
     --tokenizer-path $LLAMA_BASE \

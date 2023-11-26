@@ -154,5 +154,5 @@ def set_glora_eval_config(eval_config, model):
             glora_layer = getattr(layer, tokens[-1])
             if hasattr(glora_layer,"eval_config"):
                 glora_layer.eval_config = eval_config[i]
-                print(f'layer_name:{name},eval_config:{glora_layer.eval_config}')
+                # print(f'layer_name:{name},eval_config:{glora_layer.eval_config}')
                 i = i+1

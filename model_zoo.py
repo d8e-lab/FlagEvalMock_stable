@@ -35,6 +35,7 @@ def postprocess(result,model_name:str=""):
     result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
     result = re.sub(r'</s>', '', result)
     return result
+
 def postprocess_(result,model_name:str=""):
     # result = result.split("\n")[0]
     result=result.strip("答案")
@@ -119,6 +120,52 @@ class Llama2(BaseLLM):
             assert len(results) == len(queries)
             
         results = [postprocess(result,self.name) for result in results]
+    
+        return results
+
+    def chat(self, queries, choiceses, use_logits, nt, dataset_name=""):
+        # choice_tokenss = []
+        # for choices in choiceses:
+        #     choice_tokens = [
+        #         self.tokenizer.encode(choice, add_special_tokens=False)[0]
+        #         for choice in choices
+        #     ]
+        #     choice_tokenss.append(choice_tokens)
+        # queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        # if use_logits:
+        #     results = []
+        #     outputs = self.model(inputs.input_ids)# return_last_logit=True)
+        #     logits = outputs.logits[:, -1]
+        #     for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+        #         logit = logits[i, choice_tokens] # 选取对应choice index的logit
+        #         p = logit.argmax(dim=-1)
+        #         results.append(choices[p])
+        # else:
+        gen_kwargs = {
+            "max_new_tokens": nt,
+            "num_beams": 1,
+            "do_sample": False,
+            "top_p": 0.9,
+            "temperature": 0.1,
+        } 
+        # 去除token_type_ids
+        # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+        print(inputs["input_ids"].shape)
+        print(inputs["input_ids"])
+        outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+        print(outputs)
+        print(outputs.shape)
+        # outputs = outputs[:,-1*nt:]   
+        outputs = outputs[:,inputs["input_ids"].shape[1]:]
+        
+
+        results = self.tokenizer.batch_decode(
+            outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        assert len(results) == len(queries)
+            
+        # results = [postprocess(result,self.name) for result in results]
     
         return results
 
@@ -218,11 +265,12 @@ class Llama2_GLora(Llama2):
         )
         self.model = AutoModelForCausalLM.from_pretrained(base_path, 
                                                           trust_remote_code=True)
-        load_path="/mnt/SFT_store/flageval_peft/outputs/glora/2023-10-15_06-15-55_success/final.pt"
+        load_path="/mnt/SFT_store/flageval_peft/outputs/glora/2023-10-16_18-03-57_success/final.pt"
         set_glora(self.model,4)
         load_glora(load_path,self.model)
         self.model = self.model.bfloat16().to(gpu_id).eval()
-        config_path = "/mnt/SFT_store/flageval_peft/outputs/glora/evolution/checkpoint-20.pth.tar"
+        config_path ="/mnt/SFT_store/flageval_peft/outputs/glora/evolution_2/checkpoint-20.pth.tar"
+        # config_path ="/mnt/SFT_store/flageval_peft/outputs/glora/search/2023-10-27_04-58-43/checkpoint-20.pth.tar"
         info = torch.load(config_path)
         eval_config =info['keep_top_k'][50][int(tokenizer_path)]
         set_glora_eval_config(eval_config=eval_config,model=self.model)
@@ -597,60 +645,122 @@ class AquilaChat(BaseLLM):
             results.append(out)
         results = [postprocess(result,self.name) for result in results]
         return results
-    # @torch.no_grad()
-    # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
-    #     max_length=2048
-    #     generation_config= GenerationConfig(
-    #         **{
-    #             "_from_model_config": True,
-    #             "bos_token_id": 1,
-    #             "eos_token_id": 2,
-    #             "pad_token_id": 0,
-    #             # "transformers_version": "4.28.1",
-    #             "max_new_tokens": nt,
-    #         }
-    #     )
-    #     results=[]
-    #     for query in queries:
-    #         query=preprocess(query)
-    #         # messages = []
-    #         # messages.append({"role": "user", "content": query})
-    #         # response = self.model.chat(self.tokenizer, messages)
 
-    #         # input_ids = self.build_chat_input(self, self.tokenizer, messages, generation_config.max_new_tokens)
-            
-    #         input_ids=[generation_config.bos_token_id]
-    #         input_ids+= self.tokenizer.encode(query)
-    #         if(len(input_ids)>=max_length): 
-    #             input_ids=[generation_config.bos_token_id]+input_ids[-max_length:]
-    #         input_ids = torch.LongTensor([input_ids]).to(self.device)
-    #         # outputs = self.model.generate(input_ids, generation_config=generation_config)
-    #         # response = self.tokenizer.decode(outputs[0][len(input_ids[0]):], skip_special_tokens=True)
-
-    #         # responses.append(postprocess(response))
-
-    #         stop_tokens = ["###", "[UNK]", "</s>"]
-    #         out = self.model.generate(input_ids, do_sample=False, eos_token_id=100007, 
-    #                              bad_words_ids=[[self.tokenizer.encode(token)[0] for token in stop_tokens]],
-    #                              generation_config=generation_config)[0]
-    #         out = self.tokenizer.decode(out.cpu().numpy().tolist())
-    #         results.append(out)
-    #     results = [postprocess(result,self.name) for result in results]
-    #     return results
 class YulanChat(Llama2):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
         self.name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
-        )
-        # print('model_name:',model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained("/mnt/SFT_store/LLM/YuLan-Chat-2-13b-fp16")
         self.model = (
-            AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
-            .bfloat16()
-            .to(gpu_id).eval()
-        )    # def inference(self, queries, choiceses, use_logits=False, nt=50, dataset_name=None):
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-    #     return [""]*len(queries)
+           AutoModelForCausalLM.from_pretrained("/mnt/SFT_store/LLM/YuLan-Chat-2-13b-fp16").half().to(gpu_id).eval()
+        )    
+        
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name=""):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        # queries = [ f"""[|Human|]:{q}\n[|AI|]:""" for q in queries]
+        # print(queries)
+        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=8192,return_attention_mask=True).to(self.model.device)
+        # for input in inputs:
+            # print(self.tokenizer.decode(input))
+        if use_logits:
+            results = []
+            outputs = self.model(inputs.input_ids)# return_last_logit=True)
+            logits = outputs.logits[:, -1]
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
+        else:
+            gen_kwargs = {
+                "_from_model_config": True,
+                "max_new_tokens": nt,
+                "num_beams": 1,
+                "do_sample": False,
+                "top_p": 0.9,
+                "temperature": 0.1,
+                "bos_token_id": 1,
+                "eos_token_id": 2,
+                "pad_token_id": 0,
+                "transformers_version": "4.28.1"
+            } 
+            # 去除token_type_ids
+            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            outputs = self.model.generate(**inputs, **gen_kwargs)
+            
+            outputs = outputs[:,-1*nt:]
+            
+
+            results = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(results) == len(queries)
+            
+        results = [postprocess(result,self.name) for result in results]
+    
+        return results
+    # def inference(self, queries, choiceses, use_logits, nt, dataset_name=""):
+    #     def postprocess(result, name):
+    #         # 将result转换为字符串，去除首尾的空格
+    #         result = str(result).strip()
+            
+    #         # 切分文本以"[|AI|]:"为标记
+    #         split_result = result.split("[|AI|]:")
+            
+    #         if len(split_result) > 1:
+    #             # 获取并去除首尾空格
+    #             result = split_result[1].strip()
+    #         else:
+    #             result = ""  # 如果未找到，则返回空字符串
+    #         result = re.sub(r"^[\s\n\t:：\ufff0-\uffff]+", "", result)
+    #         result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
+    #         result = re.sub(r'</s>', '', result)
+    #         return result
+    #     choice_tokenss = []
+    #     for choices in choiceses:
+    #         choice_tokens = [
+    #             self.tokenizer.encode(choice, add_special_tokens=False)[0]
+    #             for choice in choices
+    #         ]
+    #         choice_tokenss.append(choice_tokens)
+    #     queries = [preprocess(q) for q in queries]
+    #     queries = f"""[|Human|]:{queries}\n[|AI|]:<\s>"""
+    #     inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+    #     gen_kwargs = {
+    #         "max_new_tokens":nt,
+    #         "do_sample": False,
+    #         "bos_token_id": 1,
+    #         "eos_token_id": 2,
+    #         "pad_token_id": 0,
+            
+    #     } 
+    #     # 去除token_type_ids
+    #     # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+    #     outputs = self.model.generate(**inputs, **gen_kwargs)
+        
+    #     outputs = outputs[:,-1*nt:]
+        
+
+    #     results = self.tokenizer.batch_decode(
+    #         outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    #     )
+    #     # print(type(results)) list ['',]
+    #     # print(type(queries)) str
+    #     # print(results[0])
+    #     # print(results[1])
+    #     # print(queries)
+    #     print(results)
+    #     # assert len(results) == len(queries)
+            
+    #     results = [postprocess(result,self.name) for result in results]
+    #     print(results)
+    #     return results
+
 MODEL_DICT = {
     # "chatglm2-6b": ChatGLM2,
     "chatglm2-6b": Llama2,

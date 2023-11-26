@@ -12,6 +12,15 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "python": "/mnt/SFT_store/xxw/envs/flageval/bin/python",
+        },
+        {
+            "name": "Python: temp",
+            "type": "python",
+            "request": "launch",
+            "program": "/mnt/SFT_store/3090_eval/FlagEvalMock_stable/temp.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/mnt/SFT_store/xxw/envs/flageval/bin/python",
         }
     ]
 }
