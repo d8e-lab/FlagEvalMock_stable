@@ -1,3 +1,4 @@
+import csv
 import json
 import random
 import copy
@@ -14,7 +15,7 @@ ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
 B_INST, E_INST = "[INST]", "[/INST]"
 
-huggingface_datasets = ["RAFT", "TruthfulQA", "IMDB", "BoolQ", "MMLU"]
+huggingface_datasets = ["RAFT", "TruthfulQA", "IMDB", "BoolQ", "MMLU", "Chinese_MMLU"]
 
 
 class CEvalDataset(Dataset):
@@ -968,7 +969,10 @@ class MMLUDataset(Dataset):
                 sub_name = sub
                 break
         assert sub_name != ""
-        train_sample = random.sample(self.dev_dataset,self.item_size)
+        #train_sample = random.sample(self.dev_dataset,self.item_size)
+        dev_samples = [item for item in self.dev_dataset if item['subject'] == sub_name]
+        train_sample = random.sample(dev_samples, self.item_size)
+        
         prompt = [random.choice(self.prompt_heads) + sub_name + ".\n\n"]
         # prompt = [random.choice(self.prompt_heads) + cource + ".\n\n"]
         for item in train_sample:
@@ -1017,46 +1021,194 @@ class MMLUDataset(Dataset):
         return sample
 
 class CMMLUDataset(Dataset):
-    def __init__(self, ceval_path, using_gpt=False, item_size=5):
-        with open(ceval_path, "r", encoding="utf-8") as f:
-            self.dataset = json.load(f)
-        self.name = "CMMLU"
-        self.first_line = "下面是一组问题，每个问题均有四个选项，请选出正确答案。\n"
+    def __init__(self, ceval_path="", using_gpt=False, item_size=5):
+        dataset_path = "/mnt/SFT_store/flagevalmock/MMLU_Chinese/mmlu_Chinese"
+        courses = [
+            "abstract_algebra",
+            "anatomy",
+            "astronomy",
+            "business_ethics",
+            "clinical_knowledge",
+            "college_biology",
+            "college_chemistry",
+            "college_computer_science",
+            "college_mathematics",
+            "college_medicine",
+            "college_physics",
+            "computer_security",
+            "conceptual_physics",
+            "econometrics",
+            "electrical_engineering",
+            "elementary_mathematics",
+            "formal_logic",
+            "global_facts",
+            "high_school_biology",
+            "high_school_chemistry",
+            "high_school_computer_science",
+            "high_school_european_history",
+            "high_school_geography",
+            "high_school_government_and_politics",
+            "high_school_macroeconomics",
+            "high_school_mathematics",
+            "high_school_microeconomics",
+            "high_school_physics",
+            "high_school_psychology",
+            "high_school_statistics",
+            "high_school_us_history",
+            "high_school_world_history",
+            "human_aging",
+            "human_sexuality",
+            "international_law",
+            "jurisprudence",
+            "logical_fallacies",
+            "machine_learning",
+            "management",
+            "marketing",
+            "medical_genetics",
+            "miscellaneous",
+            "moral_disputes",
+            "moral_scenarios",
+            "nutrition",
+            "philosophy",
+            "prehistory",
+            "professional_accounting",
+            "professional_law",
+            "professional_medicine",
+            "professional_psychology",
+            "public_relations",
+            "security_studies",
+            "sociology",
+            "us_foreign_policy",
+            "virology",
+            "world_religions",
+        ]
+        self.name = "MMLU"
+        #self.prompt_heads=["The following are multiple choice questions (with answers) about "]# append with courses+'.'
+        self.prompt_heads="以下是关于{}的选择题（附答案）"
         self.item_size = item_size
+        self.choice = ["True", "False"]
+        self.dataset,self.dev_dataset,self.sub2ind = self.load_datasets_parallel(courses=courses,dataset_path=dataset_path)
 
+    def process_dataset(self,dataset_path, sub, val_content, dev_content, sub2ind):
+        # Modified to read from CSV files locally
+        dev_dataset_file = f"{dataset_path}/dev/{sub}_dev.csv"
+        val_dataset_file = f"{dataset_path}/test/{sub}_test.csv" # test data
+        #val_dataset_file = f"{dataset_path}/dev/{sub}_dev.csv"
+        #val_dataset_file = f"{dataset_path}/test/{sub}_test.csv"
+        #dev_dataset_file = f"{dataset_path}/test/{sub}_test.csv" # test data
+        # Define headers based on the provided description
+        headers = ['question', 'choiceA', 'choiceB', 'choiceC', 'choiceD', 'answer']
+        
+        # Load test data
+        with open(val_dataset_file, "r", encoding="utf-8") as csv_file:
+            reader = csv.DictReader(csv_file, fieldnames=headers)
+            for row in reader:
+                self.val_content_lock.acquire()
+                processed_row = {
+                    'question': row['question'],
+                    'subject': sub,
+                    'choices': [row['choiceA'], row['choiceB'], row['choiceC'], row['choiceD']],
+                    'answer': row['answer']
+                }
+                val_content.append(processed_row)
+                sub2ind.setdefault(sub, []).append(self.i)
+                self.i += 1
+                self.val_content_lock.release()
+
+        # Load dev data
+        with open(dev_dataset_file, "r", encoding="utf-8") as csv_file:
+            reader = csv.DictReader(csv_file, fieldnames=headers)
+            for row in reader:
+                processed_row = {
+                    'question': row['question'],
+                    'subject': sub,
+                    'choices': [row['choiceA'], row['choiceB'], row['choiceC'], row['choiceD']],
+                    'answer': row['answer']
+                }
+                dev_content.append(processed_row)
+
+    def load_datasets_parallel(self,courses, dataset_path):
+        self.sub2ind_lock = threading.Lock()
+        self.val_content_lock = threading.Lock()
+
+        self.i = 0
+        val_content = []
+        dev_content = []
+        sub2ind = {}
+        threads = []
+        for sub in courses:
+            thread = threading.Thread(target=self.process_dataset, args=(dataset_path, sub, val_content, dev_content, sub2ind))
+            thread.start()
+            threads.append(thread)
+
+        # Wait for all threads to finish
+        for thread in threads:
+            thread.join()
+        return val_content, dev_content, sub2ind
+    
     def __len__(self):
         return len(self.dataset)
 
-    def __generate_prompt__(self, ban_index=-1):
-        # Select random data samples from the dataset
-        samples = random.sample(self.dataset, self.item_size)
-        # Initialize the prompt string
-        prompt = self.first_line
-        for i, sample in enumerate(samples):
-            # Add the sample information to the prompt
-            prompt += "问题：" + str(sample["Question"]) + "\n"
-            prompt += "A." + str(sample["choices"][0]) + "\n"
-            prompt += "B." + str(sample["choices"][1]) + "\n"
-            prompt += "C." + str(sample["choices"][2]) + "\n"
-            prompt += "D." + str(sample["choices"][3]) + "\n"
-            prompt += "答案：" + str(sample["Answer"]) + "\n"
-            prompt += "\n"
+    def __generate_prompt__(self, val_question_index=-1):
+        # pdb.set_trace()
+        sub_name = ""
+        
+        for sub,indexs in self.sub2ind.items():
 
+            if val_question_index in indexs:
+                sub_name = sub
+                break
+        assert sub_name != ""
+        
+        train_samples = [item for item in self.dev_dataset if item['subject'] == sub_name]
+        selected_samples = random.sample(train_samples, self.item_size)
+    
+        prompt = [self.prompt_heads.format(sub_name) + ".\n\n"]
+        #
+        # prompt = [random.choice(self.prompt_heads) + cource + ".\n\n"]
+        for item in selected_samples:
+            choice = item["choices"]  # list of choices, number of choices varies
+            # choice in prompt should have prefix of ABCE according to the number of choices
+            prompt_choice = []
+            for i in range(len(choice)):
+                prompt_choice.append(f"{chr(65+i)}. {choice[i]}")
+            prompt_choice = "\n".join(prompt_choice)
+            Flag = ""
+
+            Choice = []
+            for i in range(len(choice)):
+                Choice.append(f"{chr(65+i)}")
+            if item.get("answer", "") != "":
+                #Flag = Choice[item.get("answer", "")]
+                answer = item['answer']
+            prompt_item = (
+                f"问题: {item['question']}\n{prompt_choice}\n答案: {answer}\n\n"
+            )
+            prompt.append(prompt_item)
+
+        prompt = "".join(prompt)
         return prompt
 
     def __getitem__(self, index):
-        sample = []
         idx = index
         prompt = self.__generate_prompt__(idx)
-        entry = self.dataset[idx]
-        answer = entry["Answer"]
-        prompt += "问题：" + str(entry["Question"]) + "\n"
-        prompt += "A." + str(entry["choices"][0]) + "\n"
-        prompt += "B." + str(entry["choices"][1]) + "\n"
-        prompt += "C." + str(entry["choices"][2]) + "\n"
-        prompt += "D." + str(entry["choices"][3]) + "\n"
-        prompt += "答案：" + "\n"
-        prompt += "\n"
+        sample = self.dataset[idx]
+        choice = sample["choices"]  # list of choices, number of choices varies
+        # choice in prompt should have prefix of ABCE according to the number of choices
+        prompt_choice = []
+        for i in range(len(choice)):
+            prompt_choice.append(f"{chr(65+i)}. {choice[i]}")
+        prompt_choice = "\n".join(prompt_choice)
+        Flag = ""
+
+        Choice = []
+        for i in range(len(choice)):
+            Choice.append(f"{chr(65+i)}")
+        if sample.get("answer", "") != "":
+            #Flag = Choice[sample.get("answer", "")]
+            answer = sample['answer']
+        prompt_item = f"问题: {sample['question']}\n{prompt_choice}\n答案: \n\n"
+        prompt += prompt_item
 
         sample = {"prompt": prompt, "answer": answer}
         return sample

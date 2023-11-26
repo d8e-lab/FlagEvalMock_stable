@@ -34,6 +34,8 @@ def postprocess(result,model_name:str=""):
     result = re.sub(r"^[\s\n\t:：\ufff0-\uffff]+", "", result)
     result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
     result = re.sub(r'</s>', '', result)
+    result = re.sub(r'^[ ]+', '', result)
+    result = re.sub(r'iment: ','',result) if model_name=='InternLM' else result
     return result
 
 def postprocess_(result,model_name:str=""):
@@ -70,7 +72,7 @@ class Llama2(BaseLLM):
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
-        # print('model_name:',model_name)
+        print('gpu_id:',gpu_id)
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
             .bfloat16()
@@ -91,6 +93,7 @@ class Llama2(BaseLLM):
             choice_tokenss.append(choice_tokens)
         queries = [preprocess(q) for q in queries]
         inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        # print(inputs)
         if use_logits:
             results = []
             outputs = self.model(inputs.input_ids)# return_last_logit=True)
@@ -108,18 +111,18 @@ class Llama2(BaseLLM):
                 "temperature": 0.1,
             } 
             # 去除token_type_ids
-            # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
             outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
-            
-            outputs = outputs[:,-1*nt:]
-            
+            # print(len(inputs["input_ids"][0]),len(inputs["input_ids"][0]))
+            # outputs = outputs[:,-1*nt:]
+            outputs = outputs[:,len(inputs["input_ids"][0]):]
 
             results = self.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
-            assert len(results) == len(queries)
+            # assert len(results) == len(queries)
             
-        results = [postprocess(result,self.name) for result in results]
+        # results = [postprocess(result,self.name) for result in results]
     
         return results
 
@@ -338,53 +341,6 @@ class Qwen(Llama2):
             response=self.tokenizer.decode(response, skip_special_tokens=True)
             responses.append(postprocess(response))
         return responses
-            # print(response)
-            # exit()
-    # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
-    #     choice_tokenss = []
-    #     for choices in choiceses:
-    #         choice_tokens = [
-    #             self.tokenizer.encode(choice, add_special_tokens=False)[0]
-    #             for choice in choices
-    #         ]
-    #         choice_tokenss.append(choice_tokens)
-    #     queries = [preprocess(q) for q in queries]
-    #     inputs = self.tokenizer(queries, padding=False, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
-    #     if use_logits:
-    #         results = []
-    #         outputs = self.model(inputs.input_ids)# return_last_logit=True)
-    #         logits = outputs.logits[:, -1]
-    #         for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
-    #             logit = logits[i, choice_tokens] # 选取对应choice index的logit
-    #             p = logit.argmax(dim=-1)
-    #             results.append(choices[p])
-    #     else:
-    #         gen_kwargs = {
-    #             "max_new_tokens": nt,
-    #             "num_beams": 1,
-    #             "do_sample": False,
-    #             "top_p": 0.9,
-    #             "temperature": 0.1,
-    #         } 
-    #         # 去除token_type_ids
-    #         # inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
-    #         outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
-            
-    #         outputs = outputs[:,-1*nt:]
-            
-
-    #         results = self.tokenizer.batch_decode(
-    #             outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
-    #         )
-    #         assert len(results) == len(queries)
-            
-    #     results = [postprocess(result,self.name) for result in results]
-    
-    #     return results
-
-# if __name__ == "__main__":
-#     model = Qwen()
-#     pass
 
 class BaiChuan2Base(Llama2):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
@@ -506,49 +462,63 @@ class BaiChuan2Chat(Llama2):
 
             responses.append(postprocess(response)) # 'Positive', 'Negative']
         return responses
-    # def inference(self, queries, choiceses, use_logits, nt, dataset_name):
-    #     choice_tokenss = []
-    #     for choices in choiceses:
-    #         choice_tokens = [
-    #             self.tokenizer.encode(choice, add_special_tokens=False)[0]
-    #             for choice in choices
-    #         ]
-    #         choice_tokenss.append(choice_tokens)
-    #     queries = [preprocess(q) for q in queries]
-    #     inputs = self.tokenizer(queries,return_tensors='pt',max_length=2048).to(self.model.device)
-    #     gen_kwargs = {
-    #         "max_new_tokens": nt,
-    #         "repetition_penalty":1.1,
-    #     }
-    #     outputs = self.model.generate(**inputs,**gen_kwargs)
-    #     outputs = outputs[:,-1*nt:]
-    #     results = self.tokenizer.batch_decode(
-    #         outputs,
-    #         skip_special_tokens=True
-    #     )
-    #     return results
-
-
 
 
 class InternLM(BaseLLM):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
+        self.gpu_id=gpu_id
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path,local_files_only=True,padding_side='left',truncation_side="left" , trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path,local_files_only=True, trust_remote_code=True).bfloat16().cuda(gpu_id).eval()    
+    
+    @torch.no_grad()
+    def inference(self, queries,choiceses=None, use_logits=False, nt=50, dataset_name=None):
+        results = []
+        gen_kwargs = {
+            # "max_length": 128,
+            "max_new_tokens": nt, 
+            "top_p": 0.9, 
+            "num_beams": 1,
+            "temperature": 0.1, 
+            "do_sample": False, 
+            "repetition_penalty": 1.05
+        }
+        queries = [preprocess(q) for q in queries]
+        
+        # inputs = self.tokenizer(queries,padding=True,truncation=True, return_tensors="pt",max_length=8192).to(self.model.device)
+        # outputs = self.model.generate(**inputs, **gen_kwargs)
+        # outputs = outputs[:,-1*nt:]
+        # results = self.tokenizer.batch_decode(outputs,skip_special_tokens=True,
+        #                                       clean_up_tokenization_spaces=False)
+        for query in queries:
+            # print("query: ",query)
+            inputs = self.tokenizer([query], return_tensors="pt", truncation=False, padding=True, max_length=8192)
+            if len(inputs) > 8192:
+                # cut_len=8192-len(self.start_token["input_ids"][0])
+                inputs = {k: v[:,-1*8192:] for k, v in inputs.items() if torch.is_tensor(v)}
+                # inputs = {k: torch.cat((self.start_token[k],v),dim=1) for k, v in inputs.items() if torch.is_tensor(v)}
+            inputs = {k: v.to(self.model.device) for k, v in inputs.items() if torch.is_tensor(v)}
+            outputs = self.model.generate(**inputs, **gen_kwargs)
+            outputs = outputs[0].cpu().tolist()
+            outputs = outputs[len(inputs["input_ids"][0]):]
+            result = self.tokenizer.decode(outputs, skip_special_tokens=True)
+            results.append(result)
+        results = [postprocess(result,self.__class__.__name__) for result in results]
+        return results
+
+class InternLM_Chat(BaseLLM):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
         super().__init__()
         self.name = "InternLM"
         # self.history = []
         
-        self.tokenizer = AutoTokenizer.from_pretrained("internlm/internlm-chat-7b",cache_dir = tokenizer_path,local_files_only=True,padding_side='left',truncation_side="left" , trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained("internlm/internlm-chat-7b",cache_dir = model_path,local_files_only=True, trust_remote_code=True).bfloat16().cuda(gpu_id).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path,local_files_only=True,padding_side='left',truncation_side="left" , trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path,local_files_only=True, trust_remote_code=True).bfloat16().cuda(gpu_id).eval()
         
         # Setting padding tokens if required
         self.tokenizer.pad_token = self.tokenizer.bos_token
         self.model.config.pad_token_id = self.model.config.bos_token_id
         self.device=self.model.device
-        # self.starter="""<|User|>:"""
-        # {'input_ids': tensor([[    1,   333,   352,  1621,   352, 27232]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1]])}
         self.start_token=self.tokenizer(["""<|User|>:"""], return_tensors="pt")
-        # print(self.start_token)
-        # exit()
 
     def build_inputs(self, tokenizer, query: str, history: List[Tuple[str, str]] = [],max_length:int=4096):
         prompt = ""
@@ -561,7 +531,7 @@ class InternLM(BaseLLM):
     def inference(self, queries,choiceses=None, use_logits=False, nt=50, dataset_name=None):
         results = []
         gen_kwargs = {
-            "max_new_tokens": 16,
+            "max_new_tokens": nt,
             "num_beams": 1,
             "do_sample": False,
             "top_p": 0.9,
@@ -570,8 +540,6 @@ class InternLM(BaseLLM):
         before_post=[]
         queries = [preprocess(q) for q in queries]
         for query in queries:
-            # response,_ = self.model.chat(self.tokenizer, query, history=[],max_new_tokens=64,do_sample=False)
-            # inputs = self.build_inputs(self.tokenizer, query, [],max_length=3072)
             prompt = f"""<|User|>:{query}<eoh>\n<|Bot|>:"""
             inputs =  self.tokenizer([prompt], return_tensors="pt", truncation=True, padding=True, max_length=2048)
             # if inputs["input_ids"].shape[1] > 2048:
@@ -579,20 +547,9 @@ class InternLM(BaseLLM):
                 cut_len=2048-len(self.start_token["input_ids"][0])
                 inputs = {k: v[:,-1*cut_len:] for k, v in inputs.items() if torch.is_tensor(v)}
                 inputs = {k: torch.cat((self.start_token[k],v),dim=1) for k, v in inputs.items() if torch.is_tensor(v)}
-            # if not all([q_ids==s_ids for q_ids,s_ids in zip(inputs["input_ids"][:self.start_token["input_ids"].shape[0]],self.start_token["input_ids"])]):
-            # if not torch.equal(inputs["input_ids"][:, :self.start_token["input_ids"].shape[1]], self.start_token["input_ids"]):
-            #     inputs["input_ids"] = torch.cat((self.start_token["input_ids"], inputs["input_ids"]), dim=1)
-            #     inputs["attention_mask"]=torch.cat((self.start_token["attention_mask"], inputs["attention_mask"]), dim=1)
-            #     print(inputs["input_ids"].shape,inputs["attention_mask"].shape)
             inputs = {k: v.to(self.device) for k, v in inputs.items() if torch.is_tensor(v)}
-            # inputs["input_ids"]=inputs["input_ids"].bfloat16()
             outputs = self.model.generate(**inputs, **gen_kwargs)
-            # outputs = outputs[0].cpu().tolist()[-1*nt:]
-            # if len(inputs["input_ids"][0]) >= 2045:
-            #     print(inputs["input_ids"].shape,outputs[0].shape)
-            #     print(inputs["input_ids"][:,:21])
-            #     print(outputs[0][:21])
-                # exit()
+            
             outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]):]
             response = self.tokenizer.decode(outputs, skip_special_tokens=True)
             before_post.append(response)
@@ -645,7 +602,7 @@ class AquilaChat(BaseLLM):
             results.append(out)
         results = [postprocess(result,self.name) for result in results]
         return results
-
+    
 class YulanChat(Llama2):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="", gpu_id=0) -> None:
         self.name = model_name

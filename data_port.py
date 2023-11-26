@@ -86,13 +86,13 @@ ALL_NEW_TOKENS = {
     "Chinese_MMLU":1,
     "C-Eval":1,
     "GAOKAO2023":1,
-    "CSL":4, # 1, # 形式很奇怪，看看咋回事
+    "CSL":1, # 1, # 形式很奇怪，看看咋回事
     "ChID":1,
     "CLUEWSC":1, # 1, # 形式很奇怪，看看咋回事
-    "EPRSTMT":4,
-    "TNEWS":4,
-    "OCNLI":4, # Neural, Entailment, Contradiction
-    "BUSTM":4,
+    "EPRSTMT":1,
+    "TNEWS":1,
+    "OCNLI":1, # Neural, Entailment, Contradiction
+    "BUSTM":1,
 
 }
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -111,6 +111,8 @@ def get_dataset(dataset_name: str = ""):
             dataset = BoolQDataset()
         elif dataset_name == "MMLU":
             dataset = MMLUDataset()
+        elif dataset_name == "Chinese_MMLU":
+            dataset = CMMLUDataset()
     elif dataset_name in ALL_DIRPATH_DIC:
         datasets = []
         valjson = ALL_DIRPATH_DIC[dataset_name]
@@ -146,8 +148,8 @@ def get_dataset(dataset_name: str = ""):
                         # dataset = LinkSoulCEvalDataset(valjson)
                     elif dataset_name == "GAOKAO2023":
                         dataset = GAOKAO2023Dataset(valjson)
-                    elif dataset_name == "Chinese_MMLU":
-                        dataset = CMMLUDataset(valjson)
+                    # elif dataset_name == "Chinese_MMLU":
+                    #     dataset = CMMLUDataset(valjson)
                     if len(dataset) == 0:
                         continue
                 except Exception as e:

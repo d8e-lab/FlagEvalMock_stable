@@ -75,6 +75,7 @@ model_builder = MODEL_DICT[args.model_name]
 # 模型加载
 ddp_setup()
 gpu_id=int(int(os.environ["LOCAL_RANK"]))
+# pdb.set_trace()
 llm = model_builder(args.model_name, args.model_path, args.tokenizer_path, gpu_id=gpu_id)
 
 if (
