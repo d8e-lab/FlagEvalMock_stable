@@ -72,7 +72,7 @@ class Llama2(BaseLLM):
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
-        print('gpu_id:',gpu_id)
+        print('gpu_id:',gpu_id)            
         self.model = (
             AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
             .bfloat16()

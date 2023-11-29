@@ -782,6 +782,8 @@ class BoolQDataset(Dataset):
 
     def __init__(self, ceval_path="", using_gpt=False, item_size=5):
         dataset = datasets.load_dataset("/mnt/SFT_store/flagevalmock/boolq")
+        # dataset = datasets.load_dataset("boolq",cache_dir="/mnt/SFT_store/flagevalmock/boolq")
+        # dataset = datasets.load_dataset("boolq")
         # print(dataset)
         self.name = "BoolQ"
         self.prompt_heads = [""]
