@@ -18,7 +18,7 @@ from model_zoo import MODEL_DICT
 
 # from linly_llm import LinlyLLaMA2
 from functools import partial
-
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel, LlamaTokenizerFast
 #parallel
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
@@ -42,7 +42,75 @@ def set_seed(seed=0):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+def preprocess(query):
+    query=re.sub(r"^[\s\n\t\ufff0-\uffff]+", "", query)
+    query=re.sub(r"[\s\n\t\ufff0-\uffff]+$", "", query)
+    return query
 
+class Llama2_GLora():
+    def __init__(self, model_name, base_path,  test_no , glora_param_path, glora_config_path,gpu_id=0) -> None:
+        from peft import PeftConfig,PeftModel
+        from peft_utils import set_glora,load_glora,set_glora_eval_config
+        import torch
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            base_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
+        )
+        self.model = AutoModelForCausalLM.from_pretrained(base_path, 
+                                                          trust_remote_code=True)
+        set_glora(self.model,4)
+        load_glora(glora_param_path,self.model)
+        self.model = self.model.bfloat16().to(gpu_id).eval()
+        # config_path ="/mnt/SFT_store/flageval_peft/outputs/glora/search/2023-10-27_04-58-43/checkpoint-20.pth.tar"
+        info = torch.load(glora_config_path)
+        glora_config=info['keep_top_k'][50][int(test_no)]
+        set_glora_eval_config(eval_config=glora_config,model=self.model)
+        if "chatglm2" not in self.name:
+            self.tokenizer.pad_token = self.tokenizer.bos_token
+            self.model.config.pad_token_id = self.model.config.bos_token_id
+
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name=""):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        # print(inputs)
+        if use_logits:
+            results = []
+            outputs = self.model(inputs.input_ids)# return_last_logit=True)
+            logits = outputs.logits[:, -1]
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
+        else:
+            gen_kwargs = {
+                "max_new_tokens": nt,
+                "num_beams": 1,
+                "do_sample": False,
+                "top_p": 0.9,
+                "temperature": 0.1,
+            } 
+            # 去除token_type_ids
+            inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+            # print(len(inputs["input_ids"][0]),len(inputs["input_ids"][0]))
+            # outputs = outputs[:,-1*nt:]
+            outputs = outputs[:,len(inputs["input_ids"][0]):]
+
+            results = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            # assert len(results) == len(queries)
+            
+        # results = [postprocess(result,self.name) for result in results]
+        return results
+    
 set_seed(42) 
 all_start = time.time()
 parser = argparse.ArgumentParser(description="SETTINGS for MODELS")
@@ -67,15 +135,17 @@ parser.add_argument("--use-logits", action="store_true", help="")
 parser.add_argument("--batch-size", type=int, default=4, help="batch size")
 parser.add_argument("--no-save", action="store_true", help="set to not save")
 parser.add_argument("--verbose", action="store_true", help="print answers")
+parser.add_argument("--glora_param_path", type=str, default="")
+parser.add_argument("--glora_config_path", type=str, default="")
+parser.add_argument("--saver_path", type=str, default="")
 args = parser.parse_args()
 
 model_name = args.model_name
-model_builder = MODEL_DICT[args.model_name]
-# model_builder=ChatGLM2
+
 # 模型加载
 ddp_setup()
 gpu_id=int(int(os.environ["LOCAL_RANK"]))
-llm = model_builder(args.model_name, args.model_path, args.tokenizer_path, gpu_id=gpu_id)
+llm = Llama2_GLora(args.model_name, args.model_path, args.tokenizer_path,args.glora_param_path,args.glora_config_path,gpu_id=gpu_id)
 
 if (
     os.path.exists(args.saver_path)
@@ -186,21 +256,21 @@ if not args.no_save:
             result_df.to_csv(args.saver_path, index=False)
         else:
             saved_name = args.saver_path
-            if saved_name is None or saved_name == "":
-                os.system("mkdir -p ./evaluation_results/glorav2")
-                saved_name = "./evaluation_results/glorav2"
-            saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-            filename_prefix=args.model_path.split("/")[-1] if len(args.model_path.split("/")[-1]) > 0 else args.model_path.split("/")[-2]
-            saved_file = (
-                # args.model_name
-                filename_prefix
-                + "_"
-                + saved_time
-                + "_"
-                + "-".join(args.dataset_names.split(","))
-                + "_results.csv"
-            )
-            saved_name = os.path.join(saved_name, saved_file)
+            # if saved_name is None or saved_name == "":
+            #     # os.system("mkdir -p ./evaluation_results/glorav2")
+            #     saved_name = "./evaluation_results/glorav2"
+            # saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+            # filename_prefix=args.model_path.split("/")[-1] if len(args.model_path.split("/")[-1]) > 0 else args.model_path.split("/")[-2]
+            # saved_file = (
+            #     # args.model_name
+            #     filename_prefix
+            #     + "_"
+            #     + saved_time
+            #     + "_"
+            #     + "-".join(args.dataset_names.split(","))
+            #     + "_results.csv"
+            # )
+            saved_name = os.path.join(saved_name, "results.csv")
             result_df.to_csv(saved_name, index=False)
 print_rank0("Evaluation Total Time Cost:", time.time() - all_start)
 
