@@ -29,6 +29,7 @@ def preprocess(query):
 #     result = re.sub(r"[\s\n\t:：\ufff0-\uffff]+$", "", result)
 #     return result
 def postprocess(result,model_name:str=""):
+    result = result.split("\n\n")[0]
     result = result.split("\n")[0]
     result=result.strip("答案")
     result = re.sub(r"^[\s\n\t:：\ufff0-\uffff]+", "", result)
@@ -122,7 +123,7 @@ class Llama2(BaseLLM):
             )
             # assert len(results) == len(queries)
             
-        # results = [postprocess(result,self.name) for result in results]
+        results = [postprocess(result,self.name) for result in results]
     
         return results
 

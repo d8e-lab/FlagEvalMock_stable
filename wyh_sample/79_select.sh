@@ -12,7 +12,7 @@ torchrun --nproc-per-node 6 /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v2
     --model-name $MODEL \
     --model-path $LLAMA_BASE \
     --tokenizer-path $LLAMA_BASE \
-    --batch-size 1
-    # --verbose \
+    --batch-size 1 \
+    --verbose \
     # > "./logs/boolq_lora.log" 
     # 

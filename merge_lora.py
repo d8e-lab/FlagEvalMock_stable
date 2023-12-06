@@ -27,11 +27,11 @@ def apply_lora(model_name_or_path, output_path, lora_path):
 
 
 
-model_name_or_path = "/mnt/store/selected-checkpoint/llama2-plus-checkpoints-freeze/checkpoint-20000"
+model_name_or_path = "/mnt/40_store/SiYuan/chat_sftv3-9750/"
 #'/mnt/store/llama2-checkpoints-plus-continue/checkpoint-2000'
-output_path = "/mnt/store/selected-checkpoint/llama2-plus-checkpoints-freeze/checkpoint-20000_ynbool/merge"
+output_path = "/mnt/40_store/xxw/trl/ppo_saved/siyuan_hh_hfrl_rm_1203/step_59/merge"
 #'/mnt/SFT_store/xxw/outputs/all_peft/lora_continue/2023-09-18_04-02-42_merge'
-lora_path = "/mnt/store/selected-checkpoint/llama2-plus-checkpoints-freeze/checkpoint-20000_ynbool/checkpoint-147600/"
+lora_path = "/mnt/40_store/xxw/trl/ppo_saved/siyuan_hh_hfrl_rm_1203/step_59"
 #'/mnt/SFT_store/xxw/outputs/all_peft/lora_continue/2023-09-18_04-02-42'
 
 apply_lora(model_name_or_path, output_path, lora_path)
