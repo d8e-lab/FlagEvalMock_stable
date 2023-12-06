@@ -16,7 +16,11 @@ B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
 B_INST, E_INST = "[INST]", "[/INST]"
 
 huggingface_datasets = ["RAFT", "TruthfulQA", "IMDB", "BoolQ", "MMLU", "Chinese_MMLU"]
+history="""[INST]<<SYS>>
+你是思源，一个由厦门大学、北京大学深圳研究生院、合肥综合性国家科学中心人工智能研究院（安徽省人工智能实验室）、安徽淘云科技股份有限公司合作研发的人工智能助手。在保证安全的前提下，回答问题要尽可能有帮助。你的答案不应该包含任何有害的、不道德的、种族主义的、性别歧视的、有毒的、危险的或非法的内容。请确保你的回答在社会上是公正和积极的。如果一个问题没有任何意义，或者与事实不一致，解释为什么，而不是回答不正确的问题。如果你不知道问题的答案，请不要分享虚假信息。
+<</SYS>>
 
+你是谁？[/INST]我是思源，一个由厦门大学、北京大学深圳研究生院、合肥综合性国家科学中心人工智能研究院（安徽省人工智能实验室）、安徽淘云科技股份有限公司合作研发的人工智能助手。"""
 
 class CEvalDataset(Dataset):
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
@@ -122,7 +126,7 @@ class CEvalDataset(Dataset):
         )
         formatted_string += f"\n答案: "
         prompt = prompt + "\n\n" + formatted_string
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         # sample.append([prompt, answer])
         return sample
         # else:
@@ -171,7 +175,7 @@ class LinkSoulCEvalDataset(CEvalDataset):
         )
         formatted_string += f"\n答案: "
         prompt = prompt + "\n\n" + formatted_string
-        sample = {"prompt": f"{B_INST} {prompt} {E_INST} ", "answer": answer}
+        sample = {"prompt": history+f"{B_INST} {prompt} {E_INST} ", "answer": answer}
         # sample.append([prompt, answer])
         return sample
     
@@ -231,7 +235,7 @@ class BUSTMDataset(Dataset):
         prompt += f"\nA. 相似"
         prompt += f"\nB. 不相似"
         prompt += f"\n答案: \n"
-        sample = {"prompt": prompt, "answer": self.prompt_dict[answer]}
+        sample = {"prompt": history+prompt, "answer": self.prompt_dict[answer]}
         return sample
 
 
@@ -297,7 +301,7 @@ class OCNLIDataset(Dataset):
         prompt += f"\nB: 中立"
         prompt += f"\nC: 蕴含"
         prompt += f"\n答案: \n"
-        sample = {"prompt": prompt, "answer": self.prompt_dict[answer]}
+        sample = {"prompt": history+prompt, "answer": self.prompt_dict[answer]}
         return sample
 
 
@@ -350,7 +354,7 @@ class GAOKAO2023Dataset(Dataset):# 只有测试集，不做修改
         prompt += "答案: " + "\n"
         prompt += "\n"
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 
@@ -452,7 +456,7 @@ class RAFTDataset(Dataset):
         prompt += item_prompt
         answer = labels[item["Label"]]
         # sample = {"prompt": prompt, "answer": answer, "labels": labels}
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
     def generate_labels(self,labels):
         choiceses=[]
@@ -552,7 +556,7 @@ class TruthfulQADataset(Dataset):
         prompt += "Answer: " +"\n"
         prompt += "\n"
         answer=ALPHABET[new_answer_index]
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 
@@ -610,7 +614,7 @@ class EPRSTMTDataset(Dataset):
         prompt += f"\nB:消极"
         prompt += f"\n答案:\n"
 
-        sample = {"prompt": prompt, "answer": self.prompt_dict[question["label"]]}
+        sample = {"prompt": history+prompt, "answer": self.prompt_dict[question["label"]]}
         return sample
 
 
@@ -714,7 +718,7 @@ class TNEWSDataset(Dataset):
         prompt += f"\nN:农业"
         prompt += f"\nO:电竞"
         prompt += f"\n答案:\n"
-        sample = {"prompt": prompt, "answer": self.prompt_dict[label]}
+        sample = {"prompt": history+prompt, "answer": self.prompt_dict[label]}
         return sample
 
 
@@ -766,7 +770,7 @@ class IMDBDataset(Dataset):
         prompt += "Sentiment: " + "\n"
         prompt += "\n"
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         # print("sample: ",sample)
         return sample
     def generate_labels(self,labels):
@@ -849,7 +853,7 @@ class BoolQDataset(Dataset):
             + "\n"
         )
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 class MMLUDataset(Dataset):
@@ -1019,7 +1023,7 @@ class MMLUDataset(Dataset):
         prompt_item = f"Question: {sample['question']}?\n{prompt_choice}\nAnswer: \n\n"
         prompt += prompt_item
 
-        sample = {"prompt": prompt, "answer": Flag}
+        sample = {"prompt": history+prompt, "answer": Flag}
         return sample
 
 class CMMLUDataset(Dataset):
@@ -1212,7 +1216,7 @@ class CMMLUDataset(Dataset):
         prompt_item = f"问题: {sample['question']}\n{prompt_choice}\n答案: \n\n"
         prompt += prompt_item
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 
@@ -1283,7 +1287,7 @@ class ChIDDataset(Dataset):
         prompt += "答案：" + "\n"
         prompt += "\n"
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 
@@ -1353,7 +1357,7 @@ class CSLDataset(Dataset):
         prompt += "答案: " + "\n"
         prompt += "\n"
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 
@@ -1421,7 +1425,7 @@ class CLUEWSCDataset(Dataset):
         prompt += "答案:\n"
         prompt += "\n"
 
-        sample = {"prompt": prompt, "answer": answer}
+        sample = {"prompt": history+prompt, "answer": answer}
         return sample
 
 # class FakeNewsDataset(Dataset):
