@@ -1,6 +1,7 @@
 # MODEL=llama2_repadapter
 MODEL=llama2
 LLAMA_BASE=/mnt/40_store/xxw/models/answer_model/
+# LLAMA_BASE=/mnt/40_store/xxw/trl/ppo_saved/siyuan_hh_hfrl_rm_on_hh_hfrl_1203_answer/step_29/merge
 # LLAMA_BASE=/mnt/SFT_store/xxw/outputs/llama2-checkpoints-plus-longer/checkpoint-27000/merged/
 # LLAMA_BASE=/home/xmu/test/flageval_peft/outputs/repadapter/llama2-checkpoints-plus-sft-v3_checkpoint-9750_repadapter_plus_data1018/
 # LLAMA_BASE=/data/wyh/llama2-checkpoints-plus-sft-v3_checkpoint-9750_repadapter_data1018/merged/
