@@ -22,7 +22,8 @@ history="""[INST]<<SYS>>
 
 你是谁？[/INST]我是思源，一个由厦门大学、北京大学深圳研究生院、合肥综合性国家科学中心人工智能研究院（安徽省人工智能实验室）、安徽淘云科技股份有限公司合作研发的人工智能助手。"""
 def format_prompt(prompt):
-    return history+f"{B_INST}{prompt}{E_INST}"
+    # return history+f"{B_INST}{prompt}{E_INST}"
+    return prompt
 class CEvalDataset(Dataset):
     def __init__(self, ceval_path, using_gpt=False, item_size=5):
         directory = os.path.dirname(ceval_path)
@@ -127,7 +128,7 @@ class CEvalDataset(Dataset):
         )
         formatted_string += f"\n答案: "
         prompt = prompt + "\n\n" + formatted_string
-        sample = {"prompt": , "answer": answer}
+        sample = {"prompt": format_prompt(prompt), "answer": answer}
         # sample.append([prompt, answer])
         return sample
         # else:
