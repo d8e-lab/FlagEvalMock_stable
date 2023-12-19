@@ -68,17 +68,46 @@ class BaseLLM:
             return max([len(self.tokenizer(l).input_ids) for l in labels.values()])
 
 class Llama2(BaseLLM):
-    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0) -> None:
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False) -> None:
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
         print('gpu_id:',gpu_id)            
-        self.model = (
-            AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
-            .bfloat16()
-            .to(gpu_id).eval()
-        )
+        if use_lock:
+            import fcntl, time
+            def tryLock(f) :
+                try :
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    return False
+                except Exception as e:
+                    return True
+
+            def tryUnLock(f) :
+                try :
+                    fcntl.flock(f, fcntl.LOCK_UN)
+                    return False
+                except Exception as e:
+                    return True
+                
+            f = open('lock', 'w+')
+            while tryLock(f):
+                time.sleep(1)
+            
+            self.model = (
+                AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
+                .bfloat16()
+                .to(gpu_id).eval()
+            )
+            
+            while tryUnLock(f):
+                time.sleep(1)
+        else:
+            self.model = (
+                AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
+                .bfloat16()
+                .to(gpu_id).eval()
+            )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id

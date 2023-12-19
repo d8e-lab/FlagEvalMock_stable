@@ -1,6 +1,6 @@
 # MODEL=llama2_repadapter
 MODEL=llama2_lora
-LLAMA_BASE=/mnt/SFT_store/flageval_peft/outputs/lora/2023-10-24_06-21-19_success
+LLAMA_BASE=/mnt/40_store/flageval_peft/outputs/lora/2023-12-11_08-09-24_success/
 # LLAMA_BASE=/mnt/SFT_store/flageval_peft/outputs/lora/2023-10-14_17-11-51_success
 current_datetime=$(date +"%m%d_%H_%M_%S")
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5
