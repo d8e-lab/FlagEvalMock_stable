@@ -67,6 +67,7 @@ class BaseLLM:
         elif isinstance(labels, dict):
             return max([len(self.tokenizer(l).input_ids) for l in labels.values()])
 
+
 class Llama2(BaseLLM):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False) -> None:
         self.name = model_name

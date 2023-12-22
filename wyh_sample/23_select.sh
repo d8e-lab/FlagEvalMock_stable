@@ -6,13 +6,12 @@ current_datetime=$(date +"%m%d_%H_%M_%S")
 # export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 export CUDA_VISIBLE_DEVICES=0,1,2
-
 # torchrun --nproc-per-node 6 main_v2dist.py --dataset-names="EPRSTMT,TNEWS,OCNLI,BUSTM" \
-torchrun --nproc-per-node 3 --master_port=25527 \
-    /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v2dist.py\
+torchrun --nproc-per-node 4 --master_port=25528 \
+    /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v2dist.py --dataset-names=$2 \
     --model-name $MODEL \
     --model-path $LLAMA_BASE \
     --tokenizer-path $LLAMA_BASE \
-    --batch-size 1
-    # --verbose \
+    --batch-size 1 \
+    --verbose \
     # > "./logs/boolq_lora.log" 
