@@ -67,6 +67,56 @@ class BaseLLM:
         elif isinstance(labels, dict):
             return max([len(self.tokenizer(l).input_ids) for l in labels.values()])
 
+class Mixtral_moe(BaseLLM):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False) -> None:
+        self.name = model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", revision="refs/pr/5",torch_dtype=torch.float16)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.model.config.pad_token_id = self.model.config.eos_token_id
+
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name=""):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        # print(inputs)
+        if use_logits:
+            results = []
+            outputs = self.model(inputs.input_ids)# return_last_logit=True)
+            logits = outputs.logits[:, -1]
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
+        else:
+            gen_kwargs = {
+                "max_new_tokens": nt,
+                "num_beams": 1,
+                "do_sample": False,
+                "top_p": 0.9,
+                "temperature": 0.1,
+            } 
+
+            inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+
+            outputs = outputs[:,len(inputs["input_ids"][0]):]
+
+            results = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            # assert len(results) == len(queries)
+
+        results = [postprocess(result,self.name) for result in results]
+    
+        return results
+
 
 class Llama2(BaseLLM):
     def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False) -> None:
@@ -777,4 +827,5 @@ MODEL_DICT = {
     "YulanChat":YulanChat,
     "llama2_repadapter":Llama2_repadapter,
     "llama2_ssf":Llama2_ssf,
+    "mistral_moe":Mixtral_moe,
 }
