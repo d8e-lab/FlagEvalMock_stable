@@ -67,6 +67,7 @@ parser.add_argument("--use-logits", action="store_true", help="")
 parser.add_argument("--batch-size", type=int, default=4, help="batch size")
 parser.add_argument("--no-save", action="store_true", help="set to not save")
 parser.add_argument("--verbose", action="store_true", help="print answers")
+parser.add_argument("--safe_tensor", action="store_true", help="print answers")
 args = parser.parse_args()
 
 model_name = args.model_name
@@ -76,7 +77,10 @@ model_builder = MODEL_DICT[args.model_name]
 ddp_setup()
 gpu_id=int(int(os.environ["LOCAL_RANK"]))
 # pdb.set_trace()
-llm = model_builder(args.model_name, args.model_path, args.tokenizer_path, gpu_id=gpu_id)
+if args.safe_tensor:
+    llm = model_builder(args.model_name, args.model_path, args.tokenizer_path, gpu_id=gpu_id, safe_tensor=True)
+else:
+    llm = model_builder(args.model_name, args.model_path, args.tokenizer_path, gpu_id=gpu_id)
 
 if (
     os.path.exists(args.saver_path)
@@ -89,6 +93,7 @@ else:
         columns=["Model", "Use_Logits", "NT"]
         + ALL_DATASET
         + [i + "_time_cost" for i in ALL_DATASET]
+        + ["model_path"]
     )
 
 use_logits = [False] if not args.use_logits else [True]
@@ -169,7 +174,7 @@ with torch.no_grad():
             # & (result_df["NT"] == nt)
         )
         if result_df.loc[condition].empty:
-            new_row = [model_name, use_logits, nt] + [None] * 2 * len(ALL_DATASET)
+            new_row = [model_name, use_logits, nt] + [None] * 2 * len(ALL_DATASET)+[args.model_path]
             new_row[result_df.columns.get_loc(dataset_name)] = acc
             new_row[result_df.columns.get_loc(dataset_name + "_time_cost")] = time_cost
             result_df.loc[len(result_df)] = new_row
@@ -179,6 +184,8 @@ with torch.no_grad():
 if not args.no_save:
     rank = dist.get_rank()
     if rank == 0:
+        # locate "model_path", write model_path to the last column
+        result_df.loc[:, "model_path"] = args.model_path
         if (
             os.path.exists(args.saver_path)
             and os.path.isfile(args.saver_path)
@@ -192,10 +199,14 @@ if not args.no_save:
                 saved_name = "./evaluation_results/"
             saved_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
             prefixs=args.model_path.split("/")
-            if len(prefixs[-1]) > 0 and prefixs[-1] != "merge":
+            if len(prefixs[-1]) > 0 and prefixs[-1] != "merge" and "checkpoint" not in prefixs[-1].lower():
                 filename_prefix=prefixs[-1]
-            elif len(prefixs[-2]) > 0 and prefixs[-2] != "merge":
+            elif len(prefixs[-2]) > 0 and prefixs[-2] != "merge" and "checkpoint" not in prefixs[-2].lower():
                 filename_prefix=prefixs[-2]
+            elif len(prefixs[-3]) > 0 and prefixs[-3] != "merge" and "checkpoint" not in prefixs[-3].lower():
+                filename_prefix=prefixs[-3]
+            elif len(prefixs[-4]) > 0 and prefixs[-4] != "merge" and "checkpoint" not in prefixs[-4].lower():
+                filename_prefix=prefixs[-4]
             else:
                 filename_prefix=args.model_name
             # filename_prefix=args.model_path.split("/")[-1] if len(args.model_path.split("/")[-1]) > 0 and args.model_path.split("/")[-1] != "merge" else args.model_path.split("/")[-2]
