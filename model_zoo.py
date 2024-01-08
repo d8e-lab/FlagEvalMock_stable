@@ -119,7 +119,7 @@ class Mixtral_moe(BaseLLM):
 
 
 class Llama2(BaseLLM):
-    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False) -> None:
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False,safe_tensor=False) -> None:
         self.name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
@@ -155,6 +155,7 @@ class Llama2(BaseLLM):
                 time.sleep(1)
         else:
             self.model = (
+                # AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True, safe_tensor=safe_tensor) #.half().cuda() #
                 AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
                 .bfloat16()
                 .to(gpu_id).eval()
