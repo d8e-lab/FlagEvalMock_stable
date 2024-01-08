@@ -1,0 +1,3 @@
+bash wyh_sample/23_no_imdb.sh /mnt/42_store/wyh/outputs/sy20b-checkpoint-76000-data1211-fully/2048-1e-6-2024-01-04_02-21-01/checkpoint-5000/ 0,1,2,3
+bash wyh_sample/23_no_imdb.sh /mnt/42_store/wyh/outputs/sy20b-checkpoint-76000-data1211-fully/2048-1e-4-2024-01-02_04-19-58/checkpoint-5000/ 0,1,2,3
+bash wyh_sample/23_no_imdb.sh /mnt/42_store/wyh/outputs/sy20b-checkpoint-76000-data1211-fully/2048-1e-7-2023-12-31_17-25-27/checkpoint-5000/ 0,1,2,3
