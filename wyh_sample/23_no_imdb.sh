@@ -26,4 +26,4 @@ torchrun --nproc-per-node ${nproc} --master_port=25521 /mnt/SFT_store/3090_eval/
     --model-path $LLAMA_BASE \
     --tokenizer-path $LLAMA_BASE \
     --batch-size 1 \
-    --verbose > "./logs/${MODEL}/$(basename "${LLAMA_BASE}")/${current_datetime}.log" 2>&1
+    --verbose #> "./logs/${MODEL}/$(basename "${LLAMA_BASE}")/${current_datetime}.log" 2>&1

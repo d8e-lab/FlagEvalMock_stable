@@ -1,5 +1,5 @@
 MODEL=mistral_moe
-BASE="/mnt/82_store/xxw/models/Mixtral-8x7B-v0.1"
+BASE="/mnt/82_store/xxw/models/Mixtral-8x7B-Instruct-v0.1"
 current_datetime=$(date +"%m%d_%H_ %M_%S")
 export CUDA_VISIBLE_DEVICES=0,1
 
