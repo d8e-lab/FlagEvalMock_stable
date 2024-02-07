@@ -1,4 +1,4 @@
-MODEL=llama2
+MODEL=InternLM
 # directory=/mnt/SFT_store/xxw/outputs/0924_merge/
 directory=$1
 
@@ -20,8 +20,8 @@ for LLAMA_BASE in "${file_list[@]}"; do
     mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})"
     echo ./logs/${MODEL}/$(basename "${LLAMA_BASE}")/
     current_datetime=$(date +"%m%d_%H_%M_%S")
-    CUDA_VISIBLE_DEVICES=2,3
-    torchrun --nproc-per-node 2 --master_port=25523 main_v2dist.py --dataset-names="TruthfulQA,RAFT,CLUEWSC,EPRSTMT" \
+    export CUDA_VISIBLE_DEVICES=0,1,2,3
+    torchrun --nproc-per-node 2 --master_port 25523 main_v2dist.py --dataset-names="ALL" \
         --model-name $MODEL \
         --model-path $LLAMA_BASE \
         --tokenizer-path $LLAMA_BASE \

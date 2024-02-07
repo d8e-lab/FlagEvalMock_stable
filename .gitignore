@@ -1,4 +1,6 @@
 ## Project Specified
+.vscode/
+lock
 SiYuan/
 *.tar
 *.log

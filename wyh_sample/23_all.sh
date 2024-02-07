@@ -4,8 +4,8 @@ LLAMA_BASE=$1
 current_datetime=$(date +"%m%d_%H_%M_%S")
 # export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5
 # export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-export CUDA_VISIBLE_DEVICES=4,5,7
-# export CUDA_VISIBLE_DEVICES=0,1,2
+# export CUDA_VISIBLE_DEVICES=4,5,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 input=${CUDA_VISIBLE_DEVICES}
 # Set IFS to comma so that word splitting occurs at commas
 IFS=',' 

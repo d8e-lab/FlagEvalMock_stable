@@ -17,13 +17,17 @@ IFS=','
 read -ra arr <<< "$input"
 # Display length of the array to get count
 nproc=${#arr[@]}
+saverPath=$3
 # torchrun --nproc-per-node 6 main_v2dist.py --dataset-names="EPRSTMT,TNEWS,OCNLI,BUSTM" \
 # "BoolQ,MMLU,TruthfulQA,RAFT,GAOKAO2023,CSL,ChID,CLUEWSC,EPRSTMT,TNEWS,OCNLI,BUSTM"\
-mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})/"
+# mkdir -p "./logs/${MODEL}/$(basename ${LLAMA_BASE})/"
 # torchrun --nproc-per-node ${nproc} --master_port=25524 /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v2dist.py --dataset-names="TruthfulQA,RAFT,CLUEWSC,EPRSTMT" \
-torchrun --nproc-per-node ${nproc} --master_port=25521 /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v2dist.py --dataset-names="BoolQ,MMLU,TruthfulQA,RAFT,GAOKAO2023,CSL,ChID,CLUEWSC,EPRSTMT,TNEWS,OCNLI,BUSTM" \
+# torchrun --nproc-per-node ${nproc} --master_port=25521 /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v2dist.py --dataset-names="BoolQ,MMLU,TruthfulQA,RAFT,GAOKAO2023,CSL,ChID,CLUEWSC,EPRSTMT,TNEWS,OCNLI,BUSTM" \
+# torchrun --nproc-per-node ${nproc} --master_port=25521 /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v3.py --dataset-names="BoolQ,MMLU,TruthfulQA,RAFT,GAOKAO2023,CSL,ChID,CLUEWSC,EPRSTMT,TNEWS,OCNLI,BUSTM" \
+torchrun --nproc-per-node ${nproc} --master_port=25522 /mnt/SFT_store/3090_eval/FlagEvalMock_stable/main_v3.py --dataset-names="MMLU,TNEWS" \
     --model-name $MODEL \
     --model-path $LLAMA_BASE \
     --tokenizer-path $LLAMA_BASE \
     --batch-size 1 \
-    --verbose #> "./logs/${MODEL}/$(basename "${LLAMA_BASE}")/${current_datetime}.log" 2>&1
+    --saver-path $saverPath \
+    # --verbose #> "./logs/${MODEL}/$(basename "${LLAMA_BASE}")/${current_datetime}.log" 2>&1

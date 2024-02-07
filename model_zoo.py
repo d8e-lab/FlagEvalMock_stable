@@ -116,6 +116,58 @@ class Mixtral_moe(BaseLLM):
         results = [postprocess(result,self.name) for result in results]
     
         return results
+    
+class LoRA_Mixtral_moe(BaseLLM):
+    def __init__(self, model_name, model_path, tokenizer_path, config_path="",gpu_id=0,use_lock=False) -> None:
+        self.name = model_name
+        from transformers import LoRAMixtralForCausalLM
+        self.tokenizer = AutoTokenizer.from_pretrained("/mnt/82_store/xxw/models/Mixtral-8x7B-v0.1")
+        self.model = LoRAMixtralForCausalLM.from_pretrained(model_path, device_map="auto", revision="refs/pr/5",torch_dtype=torch.float16)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.model.config.pad_token_id = self.model.config.eos_token_id
+
+    def inference(self, queries, choiceses, use_logits, nt, dataset_name=""):
+        choice_tokenss = []
+        for choices in choiceses:
+            choice_tokens = [
+                self.tokenizer.encode(choice, add_special_tokens=False)[0]
+                for choice in choices
+            ]
+            choice_tokenss.append(choice_tokens)
+        queries = [preprocess(q) for q in queries]
+        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        # print(inputs)
+        if use_logits:
+            results = []
+            outputs = self.model(inputs.input_ids)# return_last_logit=True)
+            logits = outputs.logits[:, -1]
+            for i, (choice_tokens,choices) in enumerate(zip(choice_tokenss,choiceses)):
+                logit = logits[i, choice_tokens] # 选取对应choice index的logit
+                p = logit.argmax(dim=-1)
+                results.append(choices[p])
+        else:
+            gen_kwargs = {
+                "max_new_tokens": nt,
+                "num_beams": 1,
+                "do_sample": False,
+                "top_p": 0.9,
+                "temperature": 0.1,
+            } 
+
+            inputs = {key:value for key,value in inputs.items() if key!='token_type_ids'}
+            outputs = self.model.generate(pad_token_id=self.tokenizer.pad_token_id,**inputs, **gen_kwargs)
+
+            outputs = outputs[:,len(inputs["input_ids"][0]):]
+
+            results = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            # assert len(results) == len(queries)
+
+        results = [postprocess(result,self.name) for result in results]
+    
+        return results
+
 
 
 class Llama2(BaseLLM):
@@ -125,41 +177,12 @@ class Llama2(BaseLLM):
             tokenizer_path ,padding_side='left',truncation_side="left" , trust_remote_code=True
         )
         print('gpu_id:',gpu_id)            
-        if use_lock:
-            import fcntl, time
-            def tryLock(f) :
-                try :
-                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    return False
-                except Exception as e:
-                    return True
-
-            def tryUnLock(f) :
-                try :
-                    fcntl.flock(f, fcntl.LOCK_UN)
-                    return False
-                except Exception as e:
-                    return True
-                
-            f = open('lock', 'w+')
-            while tryLock(f):
-                time.sleep(1)
-            
-            self.model = (
-                AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
-                .bfloat16()
-                .to(gpu_id).eval()
-            )
-            
-            while tryUnLock(f):
-                time.sleep(1)
-        else:
-            self.model = (
-                # AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True, safe_tensor=safe_tensor) #.half().cuda() #
-                AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True) #.half().cuda() #
-                .bfloat16()
-                .to(gpu_id).eval()
-            )
+        self.model = (
+            # AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True, safe_tensor=safe_tensor) #.half().cuda() #
+            AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True).bfloat16().to(gpu_id).eval()
+            # .bfloat16()
+            # .to(gpu_id).eval()
+        )
         if "chatglm2" not in self.name:
             self.tokenizer.pad_token = self.tokenizer.bos_token
             self.model.config.pad_token_id = self.model.config.bos_token_id
@@ -174,7 +197,7 @@ class Llama2(BaseLLM):
             ]
             choice_tokenss.append(choice_tokens)
         queries = [preprocess(q) for q in queries]
-        inputs = self.tokenizer(queries, padding=True, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
+        inputs = self.tokenizer(queries, padding=False, return_tensors="pt", truncation=True, max_length=2048).to(self.model.device)
         # print(inputs)
         if use_logits:
             results = []
@@ -829,4 +852,5 @@ MODEL_DICT = {
     "llama2_repadapter":Llama2_repadapter,
     "llama2_ssf":Llama2_ssf,
     "mistral_moe":Mixtral_moe,
+    "lora_mixtral":LoRA_Mixtral_moe,
 }

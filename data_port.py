@@ -21,6 +21,7 @@ from flageval_datasets import (
     IMDBDataset,
     BoolQDataset,
     MMLUDataset,
+    NewMMLUDataset,
     huggingface_datasets,
 )
 import torch
@@ -110,7 +111,8 @@ def get_dataset(dataset_name: str = ""):
         elif dataset_name == "BoolQ":
             dataset = BoolQDataset()
         elif dataset_name == "MMLU":
-            dataset = MMLUDataset()
+            # dataset = MMLUDataset()
+            dataset = NewMMLUDataset() # /mnt/SFT_store/3090_eval/FlagEvalMock_stable/wyh_sample/23_no_imdb.sh
         elif dataset_name == "Chinese_MMLU":
             dataset = CMMLUDataset()
     elif dataset_name in ALL_DIRPATH_DIC:

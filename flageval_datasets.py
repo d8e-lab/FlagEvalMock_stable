@@ -702,9 +702,9 @@ class TNEWSDataset(Dataset):
         sentence = question["sentence"]
         label = question["label_desc"]
         keywords = question["keywords"]
-        prompt += f"\n文本:"
-        prompt += f"\n新闻标题: {sentence}"
-        prompt += f"\n关键词: {keywords}"
+        prompt += f"\n文本:{sentence}"
+        # prompt += f"\n新闻标题: {sentence}"
+        # prompt += f"\n关键词: {keywords}"
         prompt += f"\nA:故事"
         prompt += f"\nB:文化"
         prompt += f"\nC:娱乐"
@@ -1027,6 +1027,63 @@ class MMLUDataset(Dataset):
         prompt += prompt_item
 
         sample = {"prompt": format_prompt(prompt), "answer": Flag}
+        return sample
+
+class NewMMLUDataset(Dataset):
+    '''
+        Use the dataset = load_dataset("cais/mmlu","all") with features: ['question', 'subject', 'choices', 'answer'],
+        data format:
+        ```
+            Question:
+            A. <choice>
+            ...
+            D. <choice>
+            Answer: <answer>
+        ```
+        head+"\n"
+        data_1+"\n"
+        ...
+        data_5+"\n"
+        question
+    '''
+    def __init__(self, ceval_path="", using_gpt=False, item_size=5):
+        self.name = "MMLU"
+        assert item_size <=5, "item_size should be less than 5 because of dev-set size is 5."
+        self.item_size = item_size
+        self.dataset =load_dataset("cais/mmlu","all",split="test")
+        self.dev_dataset=load_dataset("cais/mmlu","all",split="dev")
+        self.prompt_head="The following are multiple choice questions (with answers) about {subject}.\n"
+    def __len__(self):
+        return len(self.dataset)
+
+    def __generate_prompt__(self, subject:str=""):
+        samples=[]
+        for d in self.dev_dataset:
+            if d["subject"]==subject:
+                samples.append(d)
+        samples=random.sample(samples,self.item_size)
+        prompt=""
+        for s in samples:
+            sp="Question: "+s["question"]+"\n"
+            for i,c in enumerate(s["choices"]):
+                sp+=f"{chr(65+i)}. {c}\n"
+            sp+="Answer: {}\n".format(s["answer"])
+            prompt+=sp+"\n"
+        return prompt
+    def __getitem__(self, index):
+        idx = index
+        data = self.dataset[idx]
+        prompt = self.prompt_head.format(subject=data["subject"])+"\n"
+        prompt += self.__generate_prompt__(data["subject"])
+        
+        s=data # Directly copy from __generate_prompt__
+        sp="Question: "+s["question"]+"\n"
+        for i,c in enumerate(s["choices"]):
+            sp+=f"{chr(65+i)}. {c}\n"
+        sp+=f"Answer: \n"
+        
+        prompt+=sp
+        sample = {"prompt": format_prompt(prompt), "answer": chr(data["answer"]+65)}
         return sample
 
 class CMMLUDataset(Dataset):
