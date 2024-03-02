@@ -5,6 +5,8 @@ SiYuan/
 *.tar
 *.log
 *.csv
+*.lock
+*.arrow
 logs/*
 __pycache__/*
 evaluation_results/*

@@ -1350,7 +1350,6 @@ class ChIDDataset(Dataset):
         sample = {"prompt": format_prompt(prompt), "answer": answer}
         return sample
 
-
 class CSLDataset(Dataset):
     """CSL dataset
     说明：
